@@ -1,14 +1,37 @@
 // Each #kernel tells which function to compile; you can have many kernels
-#pragma kernel CSMain
+#pragma kernel InitSeed
 
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
 RWTexture2D<float4> Result;
 
-[numthreads(8,8,1)]
-void CSMain (uint3 id : SV_DispatchThreadID)
+struct Point
 {
-    // TODO: insert actual code here!
+    int2 position;
+    float elevation;
+};
 
-    Result[id.xy] = float4(id.x & id.y, (id.x & 15)/15.0, (id.y & 15)/15.0, 0.0);
+struct PlateData
+{
+    Point platePoints[1024];
+    Point centerPoint;
+
+    int step;
+
+    float2 direction;
+    int type;
+};
+
+StructuredBuffer<PlateData> plates;
+int width;
+int height;
+int step;
+
+[numthreads(1, 1, 1)]
+void InitSeed(uint3 id : SV_DispatchThreadID)
+{  
+    int2 seedPos = plates[id.x].centerPoint.position;
+    uint px = uint(seedPos.x) % width;
+    uint py = uint(seedPos.y) % height;
+    Result[uint2(px, py)] = float4(px, py, id.x + 1, 1);
 }

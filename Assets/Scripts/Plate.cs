@@ -4,15 +4,17 @@ using UnityEngine;
 
 public struct Plate
 {
-    Point[] plateSpace;
-    Point centerPoint;
+    public Point[] plateSpace;
+    public Point centerPoint;
 
-    Vector2 direction;
-    int type;
+    public int spreadSpeed;
+
+    public Vector2 direction;
+    public int type;
 }
 
 public struct Point
 {
-    Vector2Int position;
-    float elevation;
+   public Vector2Int position;
+   public float elevation;
 }

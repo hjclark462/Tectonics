@@ -1,10 +1,10 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class JFA : MonoBehaviour
 {
-    public enum JFAType { VoronoiDiagram, DistanceTransform };
+    public enum JFAType { VoronoiDiagram,DistanceTransform};
     private Vector2Int[] Seeds;
 
     private Vector2[] SeedPos;
@@ -31,18 +31,18 @@ public class JFA : MonoBehaviour
         SeedPos = new Vector2[SeedAmount];
 
         Colors = new Vector3[SeedAmount];
-        for (int i = 0; i < SeedAmount; i++)
+        for (int i=0;i< SeedAmount;i++)
         {
-            Seeds[i] = new Vector2Int(Random.Range(1, 2000), Random.Range(1, 2000));
+            Seeds[i] = new Vector2Int(Random.Range(1,2000), Random.Range(1, 2000));
 
             SeedSpeeds[i] = new Vector2(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
             SeedPos[i] = Seeds[i];
 
             Colors[i] = new Vector3(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f));
         }
-        seedBuffer = new ComputeBuffer(SeedAmount, sizeof(int) * 2);
+        seedBuffer = new ComputeBuffer(SeedAmount, sizeof(int)*2);
         seedBuffer.SetData(Seeds);
-        colorBuffer = new ComputeBuffer(SeedAmount, sizeof(float) * 3);
+        colorBuffer = new ComputeBuffer(SeedAmount, sizeof(float)*3);
         colorBuffer.SetData(Colors);
         InitSeedKernel = JFAShader.FindKernel("InitSeed");
         JFAKernel = JFAShader.FindKernel("JFA");
@@ -53,9 +53,9 @@ public class JFA : MonoBehaviour
 
     private void Update()
     {
-        for (int i = 0; i < SeedAmount; i++)
+        for(int i = 0; i < SeedAmount; i++)
         {
-            float tempX = SeedPos[i].x + SeedSpeeds[i].x * Time.deltaTime * Speed;
+            float tempX = SeedPos[i].x +  SeedSpeeds[i].x*Time.deltaTime*Speed;
             float tempY = SeedPos[i].y + SeedSpeeds[i].y * Time.deltaTime * Speed;
             float SpeedX = SeedSpeeds[i].x;
             float SpeedY = SeedSpeeds[i].y;
@@ -69,7 +69,7 @@ public class JFA : MonoBehaviour
                 SpeedY = -SpeedY;
                 tempY = SeedPos[i].y + SpeedY * Time.deltaTime * Speed;
             }
-            SeedPos[i] = new Vector2(tempX, tempY);
+            SeedPos[i] = new Vector2(tempX,tempY);
             SeedSpeeds[i] = new Vector2(SpeedX, SpeedY);
             Seeds[i] = new Vector2Int((int)SeedPos[i].x, (int)SeedPos[i].y);
         }
