@@ -1,37 +1,40 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel InitSeed
+#pragma kernel TestColours
 
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
+RWTexture2D<float4> Source;
 RWTexture2D<float4> Result;
-
-struct Point
-{
-    int2 position;
-    float elevation;
-};
 
 struct PlateData
 {
-    Point platePoints[1024];
-    Point centerPoint;
-
+    float4 points[1024];
+    float4 centerPoint;    
     int step;
-
-    float2 direction;
-    int type;
+    float2 direction;    
 };
 
-StructuredBuffer<PlateData> plates;
+RWStructuredBuffer<PlateData> plates;
+StructuredBuffer<float4> colours;
 int width;
 int height;
 int step;
 
+
 [numthreads(1, 1, 1)]
 void InitSeed(uint3 id : SV_DispatchThreadID)
 {  
-    int2 seedPos = plates[id.x].centerPoint.position;
+    int2 seedPos = plates[id.x].centerPoint;
     uint px = uint(seedPos.x) % width;
     uint py = uint(seedPos.y) % height;
     Result[uint2(px, py)] = float4(px, py, id.x + 1, 1);
+}
+
+[numthreads(8, 8, 1)]
+void TestColours(uint3 id : SV_DispatchThreadID)
+{
+    float4 info = Source[id.xy];
+    uint plateID = info.x;
+    Result[id.xy] = float4(colours[max(plateID - 1, 0)]);
 }
