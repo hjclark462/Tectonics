@@ -7,15 +7,14 @@
 RWTexture2D<float4> Source;
 RWTexture2D<float4> Result;
 
-struct PlateData
+struct PointData
 {
-    float4 points[1024];
-    float4 centerPoint;    
-    int step;
-    float2 direction;    
+	float4 pointOnPlate;
+	int plateType;
+	float2 direction;
 };
 
-RWStructuredBuffer<PlateData> plates;
+RWStructuredBuffer<PointData> points;
 StructuredBuffer<float4> colours;
 int width;
 int height;
@@ -24,17 +23,18 @@ int step;
 
 [numthreads(1, 1, 1)]
 void InitSeed(uint3 id : SV_DispatchThreadID)
-{  
-    int2 seedPos = plates[id.x].centerPoint;
-    uint px = uint(seedPos.x) % width;
-    uint py = uint(seedPos.y) % height;
-    Result[uint2(px, py)] = float4(px, py, id.x + 1, 1);
+{
+	int2 seedPos = points[id.x].pointOnPlate.xy;
+	uint px = uint(seedPos.x) % width;
+	uint py = uint(seedPos.y) % height;
+	Source[uint2(px, py)] = float4(px, py, id.x + 1, 1);
 }
 
 [numthreads(8, 8, 1)]
 void TestColours(uint3 id : SV_DispatchThreadID)
-{
-    float4 info = Source[id.xy];
-    uint plateID = info.x;
-    Result[id.xy] = float4(colours[max(plateID - 1, 0)]);
+{	
+	if (id.x < 128)
+	{
+		Source[id.xy] = float4(1, 0, 0, 1);
+	}
 }
