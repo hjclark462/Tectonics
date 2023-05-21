@@ -1,5 +1,6 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel InitSeed
+#pragma kernel JumpFill
 #pragma kernel TestColours
 
 // Create a RenderTexture with enableRandomWrite flag and set it
@@ -9,8 +10,11 @@ RWTexture2D<float4> Result;
 
 struct PointData
 {
-	float4 pointOnPlate;
+	float2 pixel;
+	float elevation;
+	int plate;
 	int plateType;
+	float distance;
 	float2 direction;
 };
 
@@ -20,21 +24,55 @@ int width;
 int height;
 int step;
 
+// Clamps the flood fill so that it woun't overflow the bounds of the RenderTexture
+uint2 MaintainBounds(uint2 pix)
+{
+	uint2 bounded = uint2(clamp(pix.x, 0, width), clamp(pix.y, 0, height));
+	return bounded;
+}
+
+void FindMinimumDistance(float2 current, float3 target, inout float4 minInfo)
+{
+	if (target.z > 0)
+	{
+		float distance = dot(current - target.xy, current - target.xy);
+		if (distance < minInfo.w)
+		{
+			minInfo = float4(target, distance);
+		}
+	}
+}
 
 [numthreads(1, 1, 1)]
 void InitSeed(uint3 id : SV_DispatchThreadID)
 {
-	int2 seedPos = points[id.x].pointOnPlate.xy;
-	uint px = uint(seedPos.x) % width;
-	uint py = uint(seedPos.y) % height;
+	int2 initSeedPos = points[id.x].pixel;
+	uint px = uint(initSeedPos.x) % width;
+	uint py = uint(initSeedPos.y) % height;
 	Source[uint2(px, py)] = float4(px, py, id.x + 1, 1);
 }
 
 [numthreads(8, 8, 1)]
+void JumpFill(uint3 id : SV_DispatchThreadID)
+{
+	float4 minInfo = float4(0, 0, 0, 999999);
+	FindMinimumDistance(id.xy, Source[id.xy].xyz, minInfo);
+	FindMinimumDistance(id.xy, Source[MaintainBounds(id.xy + uint2(-step, -step))].xyz, minInfo);
+	FindMinimumDistance(id.xy, Source[MaintainBounds(id.xy + uint2(-step, step))].xyz, minInfo);
+	FindMinimumDistance(id.xy, Source[MaintainBounds(id.xy + uint2(-step, 0))].xyz, minInfo);
+	FindMinimumDistance(id.xy, Source[MaintainBounds(id.xy + uint2(0, -step))].xyz, minInfo);
+	FindMinimumDistance(id.xy, Source[MaintainBounds(id.xy + uint2(0, step))].xyz, minInfo);
+	FindMinimumDistance(id.xy, Source[MaintainBounds(id.xy + uint2(step, -step))].xyz, minInfo);
+	FindMinimumDistance(id.xy, Source[MaintainBounds(id.xy + uint2(step, 0))].xyz, minInfo);
+	FindMinimumDistance(id.xy, Source[MaintainBounds(id.xy + uint2(step, step))].xyz, minInfo);
+	Result[id.xy] = minInfo;
+}
+
+[numthreads(8, 8, 1)]
 void TestColours(uint3 id : SV_DispatchThreadID)
-{	
-	if (id.x < 128)
-	{
-		Source[id.xy] = float4(1, 0, 0, 1);
-	}
+{
+	// TODO: insert actual code here!
+	float4 info = Source[id.xy];
+	uint seedID = info.z;
+	Result[id.xy] = float4(colours[seedID]);
 }

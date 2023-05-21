@@ -39,8 +39,6 @@ void InitSeed (uint3 id : SV_DispatchThreadID)
 	Source[uint2(px,py)] = float4(px,py,id.x+1,1);
 }
 
-
-
 [numthreads(8,8,1)]
 void JFA (uint3 id : SV_DispatchThreadID)
 {

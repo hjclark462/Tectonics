@@ -5,8 +5,6 @@ using static Unity.VisualScripting.Member;
 
 public class Tectonics : MonoBehaviour
 {
-    public RenderTexture test1A;
-    public RenderTexture test2A;
     RenderTexture test1;
     RenderTexture test2;
     public MeshRenderer mr;
@@ -14,16 +12,17 @@ public class Tectonics : MonoBehaviour
     ComputeBuffer plateBuffer;
     ComputeBuffer colourBuffer;
 
-    int plateAmount = 4;
+    int plateAmount = 16;
     List<Point> points;
     Vector4[] colours;
 
     int plateInitKernel;
-    int coloursKernal;
-        
+    int jumpFillKernel;
+    int coloursKernel;
+
     void Start()
     {
-        InitTextures();    
+        InitTextures();
         points = new List<Point>();
         colours = new Vector4[plateAmount];
         for (int i = 0; i < plateAmount; i++)
@@ -37,38 +36,39 @@ public class Tectonics : MonoBehaviour
             p.direction = new Vector2Int(Random.Range(-2, 2), Random.Range(-2, 2));
             p.points = new Vector4(Random.Range(0, test1.width), Random.Range(0, test1.height), 0, i);
             if (p.plateType == 1)
-            {                
-                p.points.z = Random.Range(0.0f, 1.0f);
+            {
+                p.elevation = Random.Range(0.0f, 1.0f);
             }
             else
             {
-                p.points.z = Random.Range(-1.0f, 0.0f);
+                p.elevation = Random.Range(-1.0f, 0.0f);
             }
             colours[i] = new Vector4(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f), 1);
             points.Add(p);
-        }        
-        
-        int pointArraySize = (sizeof(float) * 5 + sizeof(int) *3);
-        plateBuffer = new ComputeBuffer(plateAmount, pointArraySize);
+        }
+
+        int pointArraySize = (sizeof(float) * 5 + sizeof(int) * 3);
+        plateBuffer = new ComputeBuffer(plateAmount, pointArraySize, ComputeBufferType.Append);
         plateBuffer.SetData(points);
-        colourBuffer = new ComputeBuffer(plateAmount, sizeof(float)*4);
+        colourBuffer = new ComputeBuffer(plateAmount, sizeof(float) * 4);
         colourBuffer.SetData(colours);
-        
+
         plateInitKernel = jumpFill.FindKernel("InitSeed");
-        coloursKernal = jumpFill.FindKernel("TestColours");
+        coloursKernel = jumpFill.FindKernel("TestColours");
+        jumpFillKernel = jumpFill.FindKernel("JumpFill");
+        
+        TestColours();
     }
 
     private void Update()
     {
-        TestColours();
-        
+
     }
 
     private void OnDisable()
     {
-        Debug.Log("Dest");
         plateBuffer.Release();
-        colourBuffer.Release();   
+        colourBuffer.Release();
         plateBuffer = null;
         colourBuffer = null;
     }
@@ -88,28 +88,48 @@ public class Tectonics : MonoBehaviour
         UnityEngine.RenderTexture.active = test1;
         GL.Clear(true, true, Color.clear);
         UnityEngine.RenderTexture.active = rt;
-    }   
+    }
 
-    void TestColours() 
+    void TestColours()
     {
-        /*plateBuffer.SetData(points);
+        plateBuffer.SetData(points);
         jumpFill.SetBuffer(plateInitKernel, "points", plateBuffer);
         jumpFill.SetTexture(plateInitKernel, "Source", test1);
         jumpFill.SetTexture(plateInitKernel, "Result", test2);
         jumpFill.SetInt("width", test1.width);
         jumpFill.SetInt("height", test1.height);
-        jumpFill.Dispatch(plateInitKernel, plateAmount, 1, 1);*/
+
+
+
+        jumpFill.Dispatch(plateInitKernel, plateAmount, 1, 1);
+
+
+        int stepAmount = (int)Mathf.Log(Mathf.Max(test1.width, test1.height), 2);
 
         int threadGroupsX = Mathf.CeilToInt(test1.width / 8.0f);
         int threadGroupsY = Mathf.CeilToInt(test1.height / 8.0f);
 
-        jumpFill.SetBuffer(coloursKernal, "colours", colourBuffer);
-        jumpFill.SetTexture(coloursKernal, "Source", test1, 0, UnityEngine.Rendering.RenderTextureSubElement.Color);
-        jumpFill.SetTexture(coloursKernal, "Result", test2, 0, UnityEngine.Rendering.RenderTextureSubElement.Color);
-        jumpFill.Dispatch(coloursKernal, threadGroupsX, threadGroupsY, 1);
+        for (int i = 0; i < stepAmount; i++)
+        {
+            int step = (int)Mathf.Pow(2, stepAmount - i - 1);
+            jumpFill.SetInt("step", step);
+            jumpFill.SetTexture(jumpFillKernel, "Source", test1);
+            jumpFill.SetTexture(jumpFillKernel, "Result", test2);
 
-        test1A = test1;
-        test2A = test2;
+
+            jumpFill.Dispatch(jumpFillKernel, threadGroupsX, threadGroupsY, 1);
+            Graphics.Blit(test2, test1);
+
+        }
+
+        jumpFill.SetBuffer(coloursKernel, "colours", colourBuffer);
+        jumpFill.SetTexture(coloursKernel, "Source", test1);
+        jumpFill.SetTexture(coloursKernel, "Result", test2);
+
+        jumpFill.Dispatch(coloursKernel, threadGroupsX, threadGroupsY, 1);
+
+
+        Graphics.Blit(test2, test1);
         mr.sharedMaterial.SetTexture("_BaseMap", test1);
     }
 }

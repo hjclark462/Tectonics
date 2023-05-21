@@ -155,8 +155,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 84d4e84c2161ea74d87d744b9d65dea3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  test1A: {fileID: 8400000, guid: 9cff7bbb50c93b8469107f1dc2b868fe, type: 2}
-  test2A: {fileID: 8400000, guid: f7f7bc80f46690d4aba641a5f0507050, type: 2}
   mr: {fileID: 134478511}
   jumpFill: {fileID: 7200000, guid: aca881e59e9de9d42a77eb6410fd52c3, type: 3}
 --- !u!65 &134478510
