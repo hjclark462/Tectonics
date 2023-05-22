@@ -6,10 +6,10 @@ using UnityEngine;
 public struct Point
 {
     // XY Coordinates Z elevation W plateNumber
-    public Vector2 points;
+    public Vector2Int pixel;
     public float elevation;
     public int plate;
     public int plateType;
     public float distance;
-    public Vector2 direction;   
+    public Vector2Int direction;
 }

@@ -10,12 +10,12 @@ RWTexture2D<float4> Result;
 
 struct PointData
 {
-	float2 pixel;
+	int2 pixel;
 	float elevation;
 	int plate;
 	int plateType;
 	float distance;
-	float2 direction;
+	int2 direction;
 };
 
 RWStructuredBuffer<PointData> points;
@@ -24,11 +24,10 @@ int width;
 int height;
 int step;
 
-// Clamps the flood fill so that it woun't overflow the bounds of the RenderTexture
+// Clamps the flood fill so that it won't overflow the bounds of the RenderTexture
 uint2 MaintainBounds(uint2 pix)
 {
-	uint2 bounded = uint2(clamp(pix.x, 0, width), clamp(pix.y, 0, height));
-	return bounded;
+	return uint2(clamp(pix.x, 0, width), clamp(pix.y, 0, height));	
 }
 
 void FindMinimumDistance(float2 current, float3 target, inout float4 minInfo)
@@ -47,8 +46,8 @@ void FindMinimumDistance(float2 current, float3 target, inout float4 minInfo)
 void InitSeed(uint3 id : SV_DispatchThreadID)
 {
 	int2 initSeedPos = points[id.x].pixel;
-	uint px = uint(initSeedPos.x) % width;
-	uint py = uint(initSeedPos.y) % height;
+	uint px = uint(initSeedPos.x);
+	uint py = uint(initSeedPos.y);
 	Source[uint2(px, py)] = float4(px, py, id.x + 1, 1);
 }
 
@@ -71,8 +70,14 @@ void JumpFill(uint3 id : SV_DispatchThreadID)
 [numthreads(8, 8, 1)]
 void TestColours(uint3 id : SV_DispatchThreadID)
 {
-	// TODO: insert actual code here!
 	float4 info = Source[id.xy];
-	uint seedID = info.z;
-	Result[id.xy] = float4(colours[seedID]);
+	if (info.w < 10)
+	{
+		Result[id.xy] = float4(1, 0, 0, 1);
+	}
+	else
+	{
+		uint seedID = info.z;
+		Result[id.xy] = float4(colours[seedID-1]);
+	}
 }
