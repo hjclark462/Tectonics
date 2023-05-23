@@ -13,9 +13,11 @@ public class Tectonics : MonoBehaviour
     public MeshRenderer mr;
     public ComputeShader jumpFill;
     ComputeBuffer plateBuffer;
+    ComputeBuffer pointBuffer;
     ComputeBuffer colourBuffer;
 
-    int plateAmount = 5;
+    int plateAmount = 10;
+    Point[] plates;
     Point[] points;
     Vector4[] colours;
 
@@ -26,8 +28,10 @@ public class Tectonics : MonoBehaviour
     void Start()
     {
         InitTextures();
-        points = new Point[plateAmount];
+        plates = new Point[plateAmount];
+        points = new Point[PlateTracker.width * PlateTracker.height];
         colours = new Vector4[plateAmount];
+
        
         for (int i = 0; i < plateAmount; i++)
         {
@@ -48,12 +52,14 @@ public class Tectonics : MonoBehaviour
 
             colours[i] = new Vector4(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f), 1);
 
-            points[i] = p;
+            plates[i] = p;
         }
 
-        int pointArraySize = (sizeof(float) * 2 + sizeof(int) * 6);
-        plateBuffer = new ComputeBuffer(plateAmount, pointArraySize);
-        plateBuffer.SetData(points);
+        int pointSize = (sizeof(float) * 2 + sizeof(int) * 6);
+        plateBuffer = new ComputeBuffer(plateAmount, pointSize);
+        plateBuffer.SetData(plates);
+        pointBuffer = new ComputeBuffer(points.Length + 1, pointSize);
+        pointBuffer.SetData(points);
         colourBuffer = new ComputeBuffer(plateAmount, sizeof(float) * 4);
         colourBuffer.SetData(colours);
 
@@ -72,26 +78,28 @@ public class Tectonics : MonoBehaviour
     private void OnDisable()
     {
         plateBuffer.Release();
+        pointBuffer.Release();
         colourBuffer.Release();
         plateBuffer = null;
+        pointBuffer = null;
         colourBuffer = null;
     }
 
     void InitTextures()
     {
-        JFACalculation = new RenderTexture(256, 256, 24, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        JFACalculation = new RenderTexture(1024, 1024, 24, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
         JFACalculation.name = "JFACalculation";
         JFACalculation.enableRandomWrite = true;
         JFACalculation.Create();
-        JFAResult = new RenderTexture(256, 256, 24, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        JFAResult = new RenderTexture(1024, 1024, 24, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
         JFAResult.name = "JFAResult";
         JFAResult.enableRandomWrite = true;
         JFAResult.Create();
-        PlateTracker = new RenderTexture(256, 256, 24, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        PlateTracker = new RenderTexture(1024, 1024, 24, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
         PlateTracker.name = "PlateTracker";
         PlateTracker.enableRandomWrite = true;
         PlateTracker.Create(); 
-        PlateResult = new RenderTexture(256, 256, 24, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        PlateResult = new RenderTexture(1024, 1024, 24, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
         PlateResult.name = "PlateResult";
         PlateResult.enableRandomWrite = true;
         PlateResult.Create();
@@ -99,8 +107,9 @@ public class Tectonics : MonoBehaviour
 
     void TestColours()
     {
-        plateBuffer.SetData(points);
-        jumpFill.SetBuffer(plateInitKernel, "points", plateBuffer);
+        plateBuffer.SetData(plates);
+        jumpFill.SetBuffer(plateInitKernel, "plates", plateBuffer);
+        jumpFill.SetBuffer(plateInitKernel, "points", pointBuffer);
         jumpFill.SetTexture(plateInitKernel, "Source", JFACalculation);
         jumpFill.SetTexture(plateInitKernel, "Result", JFAResult);
         jumpFill.SetInt("width", JFACalculation.width);
