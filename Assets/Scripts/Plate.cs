@@ -10,6 +10,5 @@ public struct Point
     public float elevation;
     public int plate;
     public int plateType;
-    public float distance;
     public Vector2Int direction;
 }
