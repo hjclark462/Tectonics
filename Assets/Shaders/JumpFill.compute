@@ -4,7 +4,7 @@
 #pragma kernel TestJFAColours
 #pragma kernel SetPointData
 #pragma kernel SmoothElevation
-#pragma kernel TestElevationColours
+#pragma kernel SetHeightMap
 
 struct PointData
 {
@@ -103,12 +103,14 @@ void TestJFAColours(uint3 id : SV_DispatchThreadID)
 	}
 }
 
+// Remap the elevation from the larger range to a 0 - 1 value.
 float RemapElevation(float elevation)
 {
 	float adjustedElevation = (elevation + 1000.0f) / (1000.0f + 1000.0f);
 	return adjustedElevation;
 }
 
+// Set the data from the JFA calculation to a CPU side array. 
 [numthreads(8, 8, 1)]
 void SetPointData(uint3 id : SV_DispatchThreadID)
 {
@@ -119,24 +121,30 @@ void SetPointData(uint3 id : SV_DispatchThreadID)
 	PlateTracker[id.xy] = float4(points[pos].pixel, points[pos].elevation, 1);
 }
 
+// Find the average of the current position and its neighbours elevations to smooth the initial JFA calculation
+// accounting for whether it is a border position or not
 [numthreads(8, 8, 1)]
 void SmoothElevation(uint3 id : SV_DispatchThreadID)
 {
 	int pos = width * id.x + id.y;
 	float elevation;
 	uint2 current = PlateTracker[id.xy].xy;
+
 	if (current.x == 0)
 	{
+		// Top Left corner
 		if (current.y == 0)
 		{
 			elevation = (PlateTracker[id.xy].z + PlateTracker[uint2(id.x + 1, id.y)].z +
 				PlateTracker[uint2(id.x, id.y + 1)].z + PlateTracker[uint2(id.x + 1, id.y + 1)].z) / 4;
 		}
+		// Bottom Left corner
 		else if (current.y == height - 1)
 		{
 			elevation = (PlateTracker[uint2(id.x, id.y - 1)].z + PlateTracker[uint2(id.x + 1, id.y - 1)].z +
 				PlateTracker[id.xy].z + PlateTracker[uint2(id.x + 1, id.y)].z) / 4;
 		}
+		// Left Edge
 		else
 		{
 			elevation = (PlateTracker[uint2(id.x, id.y - 1)].z + PlateTracker[uint2(id.x + 1, id.y - 1)].z +
@@ -146,11 +154,13 @@ void SmoothElevation(uint3 id : SV_DispatchThreadID)
 	}
 	else if (current.y == 0)
 	{
+		// Top Right Corner
 		if (current.x == width - 1)
 		{
 			elevation = (PlateTracker[uint2(id.x - 1, id.y)].z + PlateTracker[id.xy].z +
 				PlateTracker[uint2(id.x - 1, id.y + 1)].z + PlateTracker[uint2(id.x, id.y + 1)].z) / 4;
 		}
+		// Top Edge
 		else
 		{
 			elevation = (PlateTracker[uint2(id.x - 1, id.y)].z + PlateTracker[id.xy].z + PlateTracker[uint2(id.x + 1, id.y)].z +
@@ -159,11 +169,13 @@ void SmoothElevation(uint3 id : SV_DispatchThreadID)
 	}
 	else if (current.x == width - 1)
 	{
+		// Bottom Right Corner
 		if (current.y == height - 1)
 		{
 			elevation = (PlateTracker[uint2(id.x - 1, id.y - 1)].z + PlateTracker[uint2(id.x, id.y - 1)].z +
 				PlateTracker[uint2(id.x - 1, id.y)].z + PlateTracker[id.xy].z) / 4;
 		}
+		// Right Edge
 		else
 		{
 			elevation = (PlateTracker[uint2(id.x - 1, id.y - 1)].z + PlateTracker[uint2(id.x, id.y - 1)].z +
@@ -171,11 +183,13 @@ void SmoothElevation(uint3 id : SV_DispatchThreadID)
 				PlateTracker[uint2(id.x - 1, id.y + 1)].z + PlateTracker[uint2(id.x, id.y + 1)].z) / 6;
 		}
 	}
+	// Bottom Edge
 	else if (current.y == height - 1)
 	{
 		elevation = (PlateTracker[uint2(id.x - 1, id.y - 1)].z + PlateTracker[uint2(id.x, id.y - 1)].z + PlateTracker[uint2(id.x + 1, id.y - 1)].z +
 			PlateTracker[uint2(id.x - 1, id.y)].z + PlateTracker[id.xy].z + PlateTracker[uint2(id.x + 1, id.y)].z) / 6;
 	}
+	// Central Position
 	else
 	{
 		elevation = (PlateTracker[uint2(id.x - 1, id.y - 1)].z + PlateTracker[uint2(id.x, id.y - 1)].z + PlateTracker[uint2(id.x + 1, id.y - 1)].z +
@@ -186,8 +200,9 @@ void SmoothElevation(uint3 id : SV_DispatchThreadID)
 	PlateResult[id.xy] = float4(points[pos].pixel, points[pos].elevation, 1);
 }
 
+// Set texture colours to a shade of white to generate a height map
 [numthreads(8, 8, 1)]
-void TestElevationColours(uint3 id : SV_DispatchThreadID)
+void SetHeightMap(uint3 id : SV_DispatchThreadID)
 {
 	float elevation = RemapElevation(PlateTracker[id.xy].z);
 	PlateResult[id.xy] = float4(elevation, elevation, elevation, 1);	

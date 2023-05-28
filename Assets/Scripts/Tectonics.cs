@@ -25,7 +25,7 @@ public class Tectonics : MonoBehaviour
     int jFAColoursKernel;
     int setPointDataKernel;
     int smoothElevationKernel;
-    int elevationColoursKernel;
+    int setHeightMapKernel;
 
     int threadGroupsX;
     int threadGroupsY;
@@ -80,7 +80,7 @@ public class Tectonics : MonoBehaviour
 
         // Colour Buffers just for testing. Marked for removal
         jFAColoursKernel = jumpFill.FindKernel("TestJFAColours");
-        elevationColoursKernel = jumpFill.FindKernel("TestElevationColours");
+        setHeightMapKernel = jumpFill.FindKernel("TestElevationColours");
 
 
         InitPlates();
@@ -210,9 +210,9 @@ public class Tectonics : MonoBehaviour
 
     void TestElevationColours()
     {
-        jumpFill.SetTexture(elevationColoursKernel, "PlateTracker", PlateTracker);
-        jumpFill.SetTexture(elevationColoursKernel, "PlateResult", PlateResult);
-        jumpFill.Dispatch(elevationColoursKernel, threadGroupsX, threadGroupsY, 1);
+        jumpFill.SetTexture(setHeightMapKernel, "PlateTracker", PlateTracker);
+        jumpFill.SetTexture(setHeightMapKernel, "PlateResult", PlateResult);
+        jumpFill.Dispatch(setHeightMapKernel, threadGroupsX, threadGroupsY, 1);
     }
    
 }
