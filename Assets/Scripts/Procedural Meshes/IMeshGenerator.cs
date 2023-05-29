@@ -1,6 +1,4 @@
 using UnityEngine;
-using Unity.Mathematics;
-using Unity.Collections;
 
 // Base generator interface which is the different shaped generators inherit from
 public interface IMeshGenerator
@@ -15,10 +13,7 @@ public interface IMeshGenerator
 
     int JobLength { get; }
 
-    int Height { get; set; }
-    int Width { get; set; }
-
-    NativeArray<float3> HeightMap { get; set; }
+    int Resolution { get; set; }
 
     // Executed by the MeshJob struct with an index parameter and an IMeshStreams struct used for 
     // defining the order the data is stored in memory

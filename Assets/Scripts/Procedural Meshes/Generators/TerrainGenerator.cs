@@ -7,58 +7,73 @@ using static Unity.Mathematics.math;
 
 public struct TerrainGenerator : IMeshGenerator
 {
-    // Set the bounds to the center of the mesh
-    public Bounds Bounds => new Bounds(Vector3.zero, new Vector3(1f, 0f, 1f));
+    // Set the bounds to the center of the rhombic quad
+    public Bounds Bounds => new Bounds(Vector3.zero, new Vector3(1f + 0.5f / Resolution, 0f, sqrt(3f) / 2f));
 
-    // The vertex count is one quad times by the rows and columns of the resolution
-    public int VertexCount => Width * Height;
+    public int VertexCount => (Resolution + 1) * (Resolution + 1);
 
-    // The index count is two tris (one quad) times by the rows and columns of the resolution
-    public int IndexCount => 6 * Width * Height;
+    public int IndexCount => 6 * Resolution * Resolution;
 
-    // One job's invocation of Execute generates a row of quads so the job length is defined by the
-    // height of the quad, the amount of rows
-    public int JobLength => Height + 1;
+    public int JobLength => Resolution + 1;
 
-    public int Width { get; set; }
+    public int Resolution { get; set; }
 
-    public int Height { get; set; }
-
-    public NativeArray<float3> HeightMap { get; set; }
-
-    // The index is the z offset of the row of quads.
     public void Execute<S>(int z, S streams) where S : struct, IMeshStreams
     {
-        int vi = (Width +1) * z;
-        int ti = 2 * Width * (z - 1);
+        int vi = (Resolution + 1) * z;
+        int ti = 2 * Resolution * (z - 1);
+
+        // offset both the x axis of the vertex positon and the u texture coordinates to line up 
+        // with the slant that happens from the generated rhombus.
+        float xOffset = -0.25f;
+        float uOffset = 0f;
+
+        int iA = -Resolution - 2;
+        int iB = -Resolution - 1;
+        int iC = -1;
+        int iD = 0;
+
+        int3 tA = int3(iA, iC, iD);
+        int3 tB = int3(iA, iD, iB);
+
+        // Bitwise operator to check for odd numbered rows so that the information can be shifted to another orientation
+        // that happens on the odd rows. 
+        if ((z & 1) == 1)
+        {
+            xOffset = 0.25f;
+            uOffset = 0.5f / (Resolution + 0.5f);
+            tA = int3(iA, iC, iB);
+            tB = int3(iB, iC, iD);
+        }
+
+        // Keep the grid centered
+        xOffset = xOffset / Resolution - 0.5f;
 
         Vertex vertex = new Vertex();
         vertex.normal.y = 1f;
         vertex.tangent.xw = float2(1f, -1f);
 
-        // Set the first vertex of the row
-        vertex.position.x = HeightMap[vi].x;
-        vertex.position.z = HeightMap[vi].y;
-        vertex.position.y = HeightMap[vi].z;
-        vertex.texCoord0.y = (float)z / Width;
+        // Set the first vertex of the row using the offset to make it an equilateral tri and
+        // adjusting the texture coords accordingly.
+        vertex.position.x = xOffset;
+        vertex.position.z = ((float)z / Resolution - 0.5f) * sqrt(3f) / 2f;
+        vertex.texCoord0.x = uOffset;
+        vertex.texCoord0.y = vertex.position.z / (1f + 0.5f / Resolution) + 0.5f;
         streams.SetVertex(vi, vertex);
-        vi += 1;
+        vi++;
 
-
-        for (int x = 1; x <= Width; x++)
+        for (int x = 1; x <= Resolution; x++)
         {
-            vertex.position.x = HeightMap[vi].x;            
-            vertex.position.y = HeightMap[vi].z;
-            vertex.texCoord0.x = (float)x / Width;
+            vertex.position.x = (float)x / Resolution + xOffset;
+            vertex.texCoord0.x = x / (Resolution + 0.5f) + uOffset;
             streams.SetVertex(vi, vertex);
 
-            // If it's the first run of the job there won't be any quads to set triangles on so skip it
+            // Only form quads on the second row of verts.
             if (z > 0)
             {
-                streams.SetTriangle(ti, vi + int3(-Width - 2, -1, -Width- 1));
-                streams.SetTriangle(ti + 1, vi + int3(-Width - 1, -1, 0));
+                streams.SetTriangle(ti + 0, vi + tA);
+                streams.SetTriangle(ti + 1, vi + tB);
             }
-
             vi++;
             ti += 2;
         }

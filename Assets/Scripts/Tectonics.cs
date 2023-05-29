@@ -41,7 +41,7 @@ public class Tectonics : MonoBehaviour
     public int smoothAmount = 10;
 
     public float heightScale = 1;
-
+    TerrainMeshGen tmg;
     NativeArray<Unity.Mathematics.float3> point3s;
 
     void Start()

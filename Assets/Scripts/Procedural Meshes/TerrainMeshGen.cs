@@ -1,20 +1,49 @@
-using System.Collections;
-using System.Collections.Generic;
+using System.IO;
+using UnityEditor;
 using UnityEngine;
-using Unity.Mathematics;
 using UnityEngine.Rendering;
-using Unity.Collections;
 
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class TerrainMeshGen : MonoBehaviour
 {
+#if UNITY_EDITOR
+
+    [ContextMenu("Construct Shape")]
+    void ConstructMesh()
+    {
+        mesh = new Mesh { name = "Procedural Mesh" };
+        GetComponent<MeshFilter>().mesh = mesh;
+        GenerateMesh();
+        vertices = mesh.vertices;
+        normals = mesh.normals;
+        tangents = mesh.tangents;
+    }
+    [ContextMenu("Save Shape")]
+    void SaveShape()
+    {
+        if (mesh != null)
+        {
+            string meshName = Path.GetFileNameWithoutExtension(gameObject.name);
+            string localPath = Path.Combine("Assets", "Meshes", meshName);
+            Directory.CreateDirectory(localPath);
+
+            var filters = gameObject.GetComponentsInChildren<MeshFilter>();
+            foreach (var filter in filters)
+            {
+                var id = filter.sharedMesh.GetInstanceID();
+                AssetDatabase.CreateAsset(filter.sharedMesh, Path.Combine(localPath, id + ".asset"));
+            }
+
+            localPath = AssetDatabase.GenerateUniqueAssetPath(localPath + ".prefab");
+
+            PrefabUtility.SaveAsPrefabAssetAndConnect(gameObject, localPath, InteractionMode.UserAction);
+        }
+    }
+
+#endif
     Vector3[] vertices;
     Vector3[] normals;
     Vector4[] tangents;
-
-    public NativeArray<float3> heightMap;
-    public int height;
-    public int width;
 
     public bool drawVerts;
 
@@ -49,16 +78,18 @@ public class TerrainMeshGen : MonoBehaviour
 
     void OnValidate() => enabled = true;
 
-/*    void Update()
+    void Update()
     {
         GenerateMesh();
-        
+        // Set the enable to false so that Update stops running until OnValidate
+        // re-activates it
+        enabled = false;
 
         vertices = mesh.vertices;
         normals = mesh.normals;
         tangents = mesh.tangents;
 
-    }*/
+    }
 
     // Degug tool to check Vertices' positions, normals and tangents
     private void OnDrawGizmos()
@@ -89,7 +120,7 @@ public class TerrainMeshGen : MonoBehaviour
 
         // Get the delegate from the enum to send the parameters to the MeshJob's
         // ScheduleJob func
-        jobs[(int)meshType](mesh, meshData, height, width, default, heightMap).Complete();
+        jobs[(int)meshType](mesh, meshData, resolution, default).Complete();
 
         // Once the job has finished the compilation of the mesh data apply it to
         // the mesh and then discard the job

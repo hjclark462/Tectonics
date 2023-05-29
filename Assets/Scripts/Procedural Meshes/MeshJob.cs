@@ -1,7 +1,6 @@
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
-using Unity.Mathematics;
 using UnityEngine;
 
 // Unity C# job compiled by Burst using multithreading in a loop form for each of the mesh types we have created
@@ -13,23 +12,21 @@ public struct MeshJob<G, S> : IJobFor where G : struct, IMeshGenerator where S :
 
     // While only using a single stream approach with the current project, multistream is another stream that may be implemented
     [WriteOnly]
-    S streams;    
+    S streams;
 
     // Pass the index and stream to the generator
     public void Execute(int i) => generator.Execute(i, streams);
 
     // Creates and schedules the MeshJob, returning its job handle. It needs mesh data and a job dependency as parameters.
     // Invoking Setup on the stream before scheduling to pass the mesh data from the generator to the stream.
-    public static JobHandle ScheduleParallel(Mesh mesh, Mesh.MeshData meshData, int height, int width, JobHandle dependency, NativeArray<float3> heightMap)
+    public static JobHandle ScheduleParallel(Mesh mesh, Mesh.MeshData meshData, int resolution, JobHandle dependency)
     {
         MeshJob<G, S> job = new MeshJob<G, S>();
-        job.generator.HeightMap = heightMap;
-        job.generator.Height = height;
-        job.generator.Width = width;
+        job.generator.Resolution = resolution;
         job.streams.Setup(meshData, mesh.bounds = job.generator.Bounds, job.generator.VertexCount, job.generator.IndexCount);
         return job.ScheduleParallel(job.generator.JobLength, 1, dependency);
     }
 }
 
 // Delegate chosen by an enum in the ProceduralMesh class so that the correct JobHandles can be completed by Burst.
-public delegate JobHandle MeshJobScheduleDelegate(Mesh mesh, Mesh.MeshData meshData, int height, int width, JobHandle dependency, NativeArray<float3> heightMap);
+public delegate JobHandle MeshJobScheduleDelegate(Mesh mesh, Mesh.MeshData meshData, int resolution, JobHandle dependency);
