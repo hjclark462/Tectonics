@@ -375,7 +375,7 @@ MonoBehaviour:
   mapWidth: 512
   mapHeight: 512
   smoothAmount: 2000
-  heightScale: 1
+  heightScale: 2.5
 --- !u!64 &1244829870
 MeshCollider:
   m_ObjectHideFlags: 0
