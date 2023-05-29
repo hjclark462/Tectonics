@@ -1,5 +1,7 @@
 using System.Collections;
+using Unity.Collections;
 using UnityEngine;
+
 
 
 public class Tectonics : MonoBehaviour
@@ -11,6 +13,7 @@ public class Tectonics : MonoBehaviour
     RenderTexture HeightMap;
     
     public MeshRenderer mr;
+    
     public ComputeShader jumpFill;
     ComputeBuffer plateBuffer;
     ComputeBuffer pointBuffer;
@@ -36,9 +39,13 @@ public class Tectonics : MonoBehaviour
     public int mapHeight = 256;
 
     public int smoothAmount = 10;
-    
+
+    public float heightScale = 1;
+
+    NativeArray<Unity.Mathematics.float3> point3s;
+
     void Start()
-    {
+    {        
         InitTextures();
         plates = new Point[plateAmount];
         points = new Point[PlateTracker.width * PlateTracker.height];
@@ -106,6 +113,7 @@ public class Tectonics : MonoBehaviour
         TestWorldColours();
         //TestJFAColours();        
         SetHeightMap();
+       
         //SaveTextureToFileUtility.SaveTextureToFile(PlateResult, "Assets/Textures/PlateColours.png", -1, -1);
         // SaveTextureToFileUtility.SaveTextureToFile(HeightMap, "Assets/Textures/HeightMap.png", -1, -1);        
     }
@@ -207,7 +215,7 @@ public class Tectonics : MonoBehaviour
         jumpFill.SetTexture(jFAColoursKernel, "JFAResult", JFAResult);
         jumpFill.Dispatch(jFAColoursKernel, threadGroupsX, threadGroupsY, 1);
 
-       // mr.sharedMaterial.SetTexture("_BaseMap", JFAResult);
+        mr.sharedMaterial.SetTexture("_BaseMap", JFAResult);
     }
 
     void SetHeightMap()
@@ -215,7 +223,8 @@ public class Tectonics : MonoBehaviour
         jumpFill.SetTexture(setHeightMapKernel, "PlateTracker", PlateTracker);
         jumpFill.SetTexture(setHeightMapKernel, "HeightMap", HeightMap);
         jumpFill.Dispatch(setHeightMapKernel, threadGroupsX, threadGroupsY, 1);
-        mr.sharedMaterial.SetTexture("_ParallaxMap", HeightMap);
+        mr.sharedMaterial.SetFloat("_Scale", heightScale);
+        mr.sharedMaterial.SetTexture("_HeightMap", HeightMap);
     }
 
     void TestWorldColours()
@@ -223,6 +232,7 @@ public class Tectonics : MonoBehaviour
         jumpFill.SetTexture(testWorldColoursKernel, "PlateTracker", PlateTracker);
         jumpFill.SetTexture(testWorldColoursKernel, "PlateResult", PlateResult);
         jumpFill.Dispatch(testWorldColoursKernel, threadGroupsX, threadGroupsY, 1);
+        mr.sharedMaterial.SetFloat("_Scale", heightScale);
         mr.sharedMaterial.SetTexture("_BaseMap", PlateResult);
     }
 

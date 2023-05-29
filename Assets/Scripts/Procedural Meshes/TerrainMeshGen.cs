@@ -49,18 +49,16 @@ public class TerrainMeshGen : MonoBehaviour
 
     void OnValidate() => enabled = true;
 
-    void Update()
+/*    void Update()
     {
         GenerateMesh();
-        // Set the enable to false so that Update stops running until OnValidate
-        // re-activates it
-        enabled = false;
+        
 
         vertices = mesh.vertices;
         normals = mesh.normals;
         tangents = mesh.tangents;
 
-    }
+    }*/
 
     // Degug tool to check Vertices' positions, normals and tangents
     private void OnDrawGizmos()
