@@ -8,8 +8,9 @@ public class Tectonics : MonoBehaviour
     RenderTexture JFAResult;
     RenderTexture PlateTracker;
     RenderTexture PlateResult;
-
-    //public MeshRenderer mr;
+    RenderTexture HeightMap;
+    
+    public MeshRenderer mr;
     public ComputeShader jumpFill;
     ComputeBuffer plateBuffer;
     ComputeBuffer pointBuffer;
@@ -20,12 +21,13 @@ public class Tectonics : MonoBehaviour
     Point[] points;
     Vector4[] colours;
 
-    int plateInitKernel;
+    int initPlateKernel;
     int jumpFillKernel;
     int jFAColoursKernel;
     int setPointDataKernel;
     int smoothElevationKernel;
     int setHeightMapKernel;
+    int testWorldColoursKernel;
 
     int threadGroupsX;
     int threadGroupsY;
@@ -33,7 +35,7 @@ public class Tectonics : MonoBehaviour
     public int mapWidth = 256;
     public int mapHeight = 256;
 
-    public int smoothAmount = 1000;
+    public int smoothAmount = 10;
     
     void Start()
     {
@@ -47,7 +49,15 @@ public class Tectonics : MonoBehaviour
             Point p = new Point();
             p.pixel = new Vector2Int(Random.Range(0, JFACalculation.width - 1), Random.Range(0, JFACalculation.height - 1));
             p.plate = i;
-            p.plateType = Random.Range(0, 1);
+            int pT= Random.Range(0, 20000);
+            if (pT <10000)
+            {
+                p.plateType = 0;
+            }
+            else
+            {
+                p.plateType = 1;
+            }
             p.direction = new Vector2Int(Random.Range(-1, 1), Random.Range(-1, 1));
             if (p.plateType == 1)
             {
@@ -73,14 +83,15 @@ public class Tectonics : MonoBehaviour
         colourBuffer = new ComputeBuffer(plateAmount, sizeof(float) * 4);
         colourBuffer.SetData(colours);
 
-        plateInitKernel = jumpFill.FindKernel("InitSeed");
+        initPlateKernel = jumpFill.FindKernel("InitPlate");
         jumpFillKernel = jumpFill.FindKernel("JumpFill");
         setPointDataKernel = jumpFill.FindKernel("SetPointData");
         smoothElevationKernel = jumpFill.FindKernel("SmoothElevation");
+        setHeightMapKernel = jumpFill.FindKernel("SetHeightMap");
 
         // Colour Buffers just for testing. Marked for removal
         jFAColoursKernel = jumpFill.FindKernel("TestJFAColours");
-        setHeightMapKernel = jumpFill.FindKernel("TestElevationColours");
+        testWorldColoursKernel = jumpFill.FindKernel("TestWorldColours");
 
 
         InitPlates();
@@ -91,27 +102,14 @@ public class Tectonics : MonoBehaviour
         {
             SmoothElevation();
         }
-        TestElevationColours();
-        // TestJFAColours();
-        //StartCoroutine(DebugPause(0.1f));        
-        SaveTextureToFileUtility.SaveTextureToFile(PlateResult, "Assets/Textures/Test.png", -1, -1);
-        Debug.Log("Should be saved");
+        
+        TestWorldColours();
+        //TestJFAColours();        
+        SetHeightMap();
+        //SaveTextureToFileUtility.SaveTextureToFile(PlateResult, "Assets/Textures/PlateColours.png", -1, -1);
+        // SaveTextureToFileUtility.SaveTextureToFile(HeightMap, "Assets/Textures/HeightMap.png", -1, -1);        
     }
-
-    IEnumerator DebugPause(float g)
-    {
-
-        yield return new WaitForSeconds(g);
-        Debug.Log("breakpoint");
-
-
-    }
-
-    private void Update()
-    {
-
-    }
-
+    
     private void OnDisable()
     {
         plateBuffer.Release();
@@ -139,7 +137,11 @@ public class Tectonics : MonoBehaviour
         PlateResult = new RenderTexture(mapWidth, mapHeight, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
         PlateResult.name = "PlateResult";
         PlateResult.enableRandomWrite = true;
-        PlateResult.Create();
+        PlateResult.Create(); 
+        HeightMap = new RenderTexture(mapWidth, mapHeight, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        HeightMap.name = "HeightMap";
+        HeightMap.enableRandomWrite = true;
+        HeightMap.Create();
 
         threadGroupsX = Mathf.CeilToInt(JFACalculation.width / 8.0f);
         threadGroupsY = Mathf.CeilToInt(JFACalculation.height / 8.0f);
@@ -148,12 +150,12 @@ public class Tectonics : MonoBehaviour
     void InitPlates()
     {
         plateBuffer.SetData(plates);
-        jumpFill.SetBuffer(plateInitKernel, "plates", plateBuffer);
-        jumpFill.SetTexture(plateInitKernel, "JFACalculation", JFACalculation);
-        jumpFill.SetTexture(plateInitKernel, "JFAResult", JFAResult);        
+        jumpFill.SetBuffer(initPlateKernel, "plates", plateBuffer);
+        jumpFill.SetTexture(initPlateKernel, "JFACalculation", JFACalculation);
+        jumpFill.SetTexture(initPlateKernel, "JFAResult", JFAResult);        
         jumpFill.SetInt("width", JFACalculation.width);
         jumpFill.SetInt("height", JFACalculation.height);
-        jumpFill.Dispatch(plateInitKernel, plateAmount, 1, 1);
+        jumpFill.Dispatch(initPlateKernel, plateAmount, 1, 1);
     }
 
     void JumpFloodAlgorithm()
@@ -208,12 +210,21 @@ public class Tectonics : MonoBehaviour
        // mr.sharedMaterial.SetTexture("_BaseMap", JFAResult);
     }
 
-    void TestElevationColours()
+    void SetHeightMap()
     {
         jumpFill.SetTexture(setHeightMapKernel, "PlateTracker", PlateTracker);
-        jumpFill.SetTexture(setHeightMapKernel, "PlateResult", PlateResult);
+        jumpFill.SetTexture(setHeightMapKernel, "HeightMap", HeightMap);
         jumpFill.Dispatch(setHeightMapKernel, threadGroupsX, threadGroupsY, 1);
+        mr.sharedMaterial.SetTexture("_ParallaxMap", HeightMap);
     }
-   
+
+    void TestWorldColours()
+    {
+        jumpFill.SetTexture(testWorldColoursKernel, "PlateTracker", PlateTracker);
+        jumpFill.SetTexture(testWorldColoursKernel, "PlateResult", PlateResult);
+        jumpFill.Dispatch(testWorldColoursKernel, threadGroupsX, threadGroupsY, 1);
+        mr.sharedMaterial.SetTexture("_BaseMap", PlateResult);
+    }
+
 }
 

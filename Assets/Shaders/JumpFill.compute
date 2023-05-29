@@ -1,10 +1,11 @@
 // Each #kernel tells which function to compile; you can have many kernels
-#pragma kernel InitSeed
+#pragma kernel InitPlate
 #pragma kernel JumpFill
 #pragma kernel TestJFAColours
 #pragma kernel SetPointData
 #pragma kernel SmoothElevation
 #pragma kernel SetHeightMap
+#pragma kernel TestWorldColours
 
 struct PointData
 {
@@ -19,6 +20,7 @@ RWTexture2D<float4> JFACalculation;
 RWTexture2D<float4> JFAResult;
 RWTexture2D<float4> PlateTracker;
 RWTexture2D<float4> PlateResult;
+RWTexture2D<float4> HeightMap;
 RWStructuredBuffer<PointData> plates;
 RWStructuredBuffer<PointData> points;
 StructuredBuffer<float4> colours;
@@ -48,14 +50,26 @@ void PointOnPlate(float2 current, float3 target, inout float4 minInfo)
 	}
 }
 
+float invLerp(float from, float to, float value)
+{
+	return (value - from) / (to - from);
+}
+
+// Remap the elevation from the larger range to a 0 - 1 value.
+float RemapElevation(float elevation)
+{
+	float adjustedElevation = invLerp(-1000, 1000, elevation);
+	return lerp(0, 1, adjustedElevation);
+}
+
 // Assign the generated plates to a co-ordinate on the texture for use in the JFA
 // Texture XY is co-ords Z is Plate ID + 1 so that 0 can be used as NULL
 [numthreads(1, 1, 1)]
-void InitSeed(uint3 id : SV_DispatchThreadID)
+void InitPlate(uint3 id : SV_DispatchThreadID)
 {
-	int2 initSeedPos = plates[id.x].pixel;
-	uint px = uint(initSeedPos.x);
-	uint py = uint(initSeedPos.y);
+	int2 InitPlatePos = plates[id.x].pixel;
+	uint px = uint(InitPlatePos.x);
+	uint py = uint(InitPlatePos.y);
 	JFACalculation[uint2(px, py)] = float4(px, py, id.x + 1, 1);
 }
 
@@ -103,13 +117,6 @@ void TestJFAColours(uint3 id : SV_DispatchThreadID)
 	}
 }
 
-// Remap the elevation from the larger range to a 0 - 1 value.
-float RemapElevation(float elevation)
-{
-	float adjustedElevation = (elevation + 1000.0f) / (1000.0f + 1000.0f);
-	return adjustedElevation;
-}
-
 // Set the data from the JFA calculation to a CPU side array. 
 [numthreads(8, 8, 1)]
 void SetPointData(uint3 id : SV_DispatchThreadID)
@@ -139,7 +146,7 @@ void SmoothElevation(uint3 id : SV_DispatchThreadID)
 				PlateTracker[uint2(id.x, id.y + 1)].z + PlateTracker[uint2(id.x + 1, id.y + 1)].z) / 4;
 		}
 		// Bottom Left corner
-		else if (current.y == height - 1)
+		else if (current.y == uint(height - 1))
 		{
 			elevation = (PlateTracker[uint2(id.x, id.y - 1)].z + PlateTracker[uint2(id.x + 1, id.y - 1)].z +
 				PlateTracker[id.xy].z + PlateTracker[uint2(id.x + 1, id.y)].z) / 4;
@@ -155,7 +162,7 @@ void SmoothElevation(uint3 id : SV_DispatchThreadID)
 	else if (current.y == 0)
 	{
 		// Top Right Corner
-		if (current.x == width - 1)
+		if (current.x == uint(width - 1))
 		{
 			elevation = (PlateTracker[uint2(id.x - 1, id.y)].z + PlateTracker[id.xy].z +
 				PlateTracker[uint2(id.x - 1, id.y + 1)].z + PlateTracker[uint2(id.x, id.y + 1)].z) / 4;
@@ -167,10 +174,10 @@ void SmoothElevation(uint3 id : SV_DispatchThreadID)
 				PlateTracker[uint2(id.x - 1, id.y + 1)].z + PlateTracker[uint2(id.x, id.y + 1)].z + PlateTracker[uint2(id.x + 1, id.y + 1)].z) / 6;
 		}
 	}
-	else if (current.x == width - 1)
+	else if (current.x == uint(width - 1))
 	{
 		// Bottom Right Corner
-		if (current.y == height - 1)
+		if (current.y == uint(height - 1))
 		{
 			elevation = (PlateTracker[uint2(id.x - 1, id.y - 1)].z + PlateTracker[uint2(id.x, id.y - 1)].z +
 				PlateTracker[uint2(id.x - 1, id.y)].z + PlateTracker[id.xy].z) / 4;
@@ -184,7 +191,7 @@ void SmoothElevation(uint3 id : SV_DispatchThreadID)
 		}
 	}
 	// Bottom Edge
-	else if (current.y == height - 1)
+	else if (current.y == uint(height - 1))
 	{
 		elevation = (PlateTracker[uint2(id.x - 1, id.y - 1)].z + PlateTracker[uint2(id.x, id.y - 1)].z + PlateTracker[uint2(id.x + 1, id.y - 1)].z +
 			PlateTracker[uint2(id.x - 1, id.y)].z + PlateTracker[id.xy].z + PlateTracker[uint2(id.x + 1, id.y)].z) / 6;
@@ -205,5 +212,33 @@ void SmoothElevation(uint3 id : SV_DispatchThreadID)
 void SetHeightMap(uint3 id : SV_DispatchThreadID)
 {
 	float elevation = RemapElevation(PlateTracker[id.xy].z);
-	PlateResult[id.xy] = float4(elevation, elevation, elevation, 1);	
+	HeightMap[id.xy] = float4(elevation, elevation, elevation, 1);
+}
+
+// Set texture colours to a shade of white to generate a height map
+[numthreads(8, 8, 1)]
+void TestWorldColours(uint3 id : SV_DispatchThreadID)
+{
+	float elevation = RemapElevation(PlateTracker[id.xy].z);
+
+	if (elevation >= 0.95)
+	{
+		PlateResult[id.xy] = float4(elevation, elevation, elevation, 1);
+	}
+	else if (elevation >= 0.75 && elevation < 0.95)
+	{
+		PlateResult[id.xy] = float4(1-elevation, 1-elevation, 1-elevation, 1);
+	}
+	else if (elevation >+ 0.52 && elevation < 0.75)
+	{
+		PlateResult[id.xy] = float4(0, 1- elevation, 0, 1);
+	}
+	else if (elevation >= 0.5 && elevation < 0.52)
+	{
+		PlateResult[id.xy] = float4(1, 1, elevation, 1);
+	}
+	else if (elevation < 0.5)
+	{
+		PlateResult[id.xy] = float4(0, 0, elevation, 1);
+	}
 }
