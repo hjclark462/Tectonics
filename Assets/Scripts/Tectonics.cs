@@ -270,7 +270,7 @@ public class Tectonics : MonoBehaviour
 
         Vector2[] uvs = new Vector2[verts.Count];
         for (var i = 0; i < uvs.Length; i++) //Give UV coords X,Z world coords
-            uvs[i] = new Vector2(verts[i].x, verts[i].z);
+            uvs[i] = new Vector2(verts[i].x/hMap.width, verts[i].z / hMap.height);
 
         GameObject plane = new GameObject("ProcPlane"); //Create GO and add necessary components
         plane.AddComponent<MeshFilter>();
@@ -278,11 +278,13 @@ public class Tectonics : MonoBehaviour
         Mesh procMesh = new Mesh();
         procMesh.vertices = verts.ToArray(); //Assign verts, uvs, and tris to the mesh
         procMesh.uv = uvs;
+        procMesh.RecalculateUVDistributionMetric(0);
         procMesh.triangles = tris.ToArray();
         procMesh.RecalculateNormals(); //Determines which way the triangles are facing
         plane.GetComponent<MeshFilter>().mesh = procMesh; //Assign Mesh object to MeshFilter
         MeshRenderer mrp = plane.GetComponent<MeshRenderer>();
-        mrp.material = material;
+        mrp.sharedMaterial = material;
+        mrp.sharedMaterial.SetTexture("_BaseMap", PlateResult);
     }
 
 }

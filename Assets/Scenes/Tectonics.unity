@@ -271,7 +271,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 84d4e84c2161ea74d87d744b9d65dea3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  material: {fileID: 2100000, guid: e909963e8ff0bba48b145a07e1cd9e2b, type: 2}
+  material: {fileID: 2100000, guid: adb90293968cd194fbbd9e9e2c8dd8ad, type: 2}
   mr: {fileID: 1244829871}
   jumpFill: {fileID: 7200000, guid: aca881e59e9de9d42a77eb6410fd52c3, type: 3}
   plateAmount: 16
