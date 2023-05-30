@@ -372,10 +372,10 @@ MonoBehaviour:
   mr: {fileID: 1244829871}
   jumpFill: {fileID: 7200000, guid: aca881e59e9de9d42a77eb6410fd52c3, type: 3}
   plateAmount: 16
-  mapWidth: 512
-  mapHeight: 512
+  mapWidth: 256
+  mapHeight: 256
   smoothAmount: 2000
-  heightScale: 2.5
+  heightScale: 30
 --- !u!64 &1244829870
 MeshCollider:
   m_ObjectHideFlags: 0

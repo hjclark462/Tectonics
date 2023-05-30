@@ -1,8 +1,9 @@
 using System.Collections;
+using System.Collections.Generic;
+using System.Security.Cryptography;
 using Unity.Collections;
 using UnityEngine;
-
-
+using UnityEngine.UI;
 
 public class Tectonics : MonoBehaviour
 {
@@ -11,9 +12,11 @@ public class Tectonics : MonoBehaviour
     RenderTexture PlateTracker;
     RenderTexture PlateResult;
     RenderTexture HeightMap;
-    
+
+    GameObject terrain;
+    TerrainData terrainData;
+
     public MeshRenderer mr;
-    
     public ComputeShader jumpFill;
     ComputeBuffer plateBuffer;
     ComputeBuffer pointBuffer;
@@ -40,24 +43,23 @@ public class Tectonics : MonoBehaviour
 
     public int smoothAmount = 10;
 
-    public float heightScale = 1;
-    TerrainMeshGen tmg;
-    NativeArray<Unity.Mathematics.float3> point3s;
+    public float heightScale = 5;
 
     void Start()
-    {        
+    {
         InitTextures();
         plates = new Point[plateAmount];
         points = new Point[PlateTracker.width * PlateTracker.height];
         colours = new Vector4[plateAmount];
+
 
         for (int i = 0; i < plateAmount; i++)
         {
             Point p = new Point();
             p.pixel = new Vector2Int(Random.Range(0, JFACalculation.width - 1), Random.Range(0, JFACalculation.height - 1));
             p.plate = i;
-            int pT= Random.Range(0, 20000);
-            if (pT <10000)
+            int pT = Random.Range(0, 20000);
+            if (pT < 10000)
             {
                 p.plateType = 0;
             }
@@ -109,15 +111,15 @@ public class Tectonics : MonoBehaviour
         {
             SmoothElevation();
         }
-        
+
         TestWorldColours();
-        //TestJFAColours();        
         SetHeightMap();
-       
+
+        CreateTerrain();
         //SaveTextureToFileUtility.SaveTextureToFile(PlateResult, "Assets/Textures/PlateColours.png", -1, -1);
         // SaveTextureToFileUtility.SaveTextureToFile(HeightMap, "Assets/Textures/HeightMap.png", -1, -1);        
     }
-    
+
     private void OnDisable()
     {
         plateBuffer.Release();
@@ -145,7 +147,7 @@ public class Tectonics : MonoBehaviour
         PlateResult = new RenderTexture(mapWidth, mapHeight, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
         PlateResult.name = "PlateResult";
         PlateResult.enableRandomWrite = true;
-        PlateResult.Create(); 
+        PlateResult.Create();
         HeightMap = new RenderTexture(mapWidth, mapHeight, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
         HeightMap.name = "HeightMap";
         HeightMap.enableRandomWrite = true;
@@ -160,7 +162,7 @@ public class Tectonics : MonoBehaviour
         plateBuffer.SetData(plates);
         jumpFill.SetBuffer(initPlateKernel, "plates", plateBuffer);
         jumpFill.SetTexture(initPlateKernel, "JFACalculation", JFACalculation);
-        jumpFill.SetTexture(initPlateKernel, "JFAResult", JFAResult);        
+        jumpFill.SetTexture(initPlateKernel, "JFAResult", JFAResult);
         jumpFill.SetInt("width", JFACalculation.width);
         jumpFill.SetInt("height", JFACalculation.height);
         jumpFill.Dispatch(initPlateKernel, plateAmount, 1, 1);
@@ -234,6 +236,50 @@ public class Tectonics : MonoBehaviour
         jumpFill.Dispatch(testWorldColoursKernel, threadGroupsX, threadGroupsY, 1);
         mr.sharedMaterial.SetFloat("_Scale", heightScale);
         mr.sharedMaterial.SetTexture("_BaseMap", PlateResult);
+    }
+
+    void CreateTerrain()
+    {
+        Texture2D hMap = new Texture2D(mapWidth, mapHeight, TextureFormat.RGB24, false);
+        RenderTexture.active = HeightMap;
+        hMap.ReadPixels(new Rect(0, 0, hMap.width, hMap.height), 0, 0);
+        hMap.Apply();
+        
+        List<Vector3> verts = new List<Vector3>();
+        List<int> tris = new List<int>();
+
+        //Bottom left section of the map, other sections are similar
+        for (int i = 0; i < 250; i++)
+        {
+            for (int j = 0; j < 250; j++)
+            {
+                //Add each new vertex in the plane
+                verts.Add(new Vector3(i, hMap.GetPixel(i, j).grayscale * 100, j));
+                //Skip if a new square on the plane hasn't been formed
+                if (i == 0 || j == 0) continue;
+                //Adds the index of the three vertices in order to make up each of the two tris
+                tris.Add(250 * i + j); //Top right
+                tris.Add(250 * i + j - 1); //Bottom right
+                tris.Add(250 * (i - 1) + j - 1); //Bottom left - First triangle
+                tris.Add(250 * (i - 1) + j - 1); //Bottom left 
+                tris.Add(250 * (i - 1) + j); //Top left
+                tris.Add(250 * i + j); //Top right - Second triangle
+            }
+        }
+
+        Vector2[] uvs = new Vector2[verts.Count];
+        for (var i = 0; i < uvs.Length; i++) //Give UV coords X,Z world coords
+            uvs[i] = new Vector2(verts[i].x, verts[i].z);
+
+        GameObject plane = new GameObject("ProcPlane"); //Create GO and add necessary components
+        plane.AddComponent<MeshFilter>();
+        plane.AddComponent<MeshRenderer>();
+        Mesh procMesh = new Mesh();
+        procMesh.vertices = verts.ToArray(); //Assign verts, uvs, and tris to the mesh
+        procMesh.uv = uvs;
+        procMesh.triangles = tris.ToArray();
+        procMesh.RecalculateNormals(); //Determines which way the triangles are facing
+        plane.GetComponent<MeshFilter>().mesh = procMesh; //Assign Mesh object to MeshFilter
     }
 
 }
