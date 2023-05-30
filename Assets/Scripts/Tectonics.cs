@@ -16,6 +16,7 @@ public class Tectonics : MonoBehaviour
     GameObject terrain;
     TerrainData terrainData;
 
+    public Material material;
     public MeshRenderer mr;
     public ComputeShader jumpFill;
     ComputeBuffer plateBuffer;
@@ -280,6 +281,8 @@ public class Tectonics : MonoBehaviour
         procMesh.triangles = tris.ToArray();
         procMesh.RecalculateNormals(); //Determines which way the triangles are facing
         plane.GetComponent<MeshFilter>().mesh = procMesh; //Assign Mesh object to MeshFilter
+        MeshRenderer mrp = plane.GetComponent<MeshRenderer>();
+        mrp.material = material;
     }
 
 }
