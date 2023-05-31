@@ -1,9 +1,12 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Security.Cryptography;
 using Unity.Collections;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
+using static UnityEngine.Rendering.DebugUI;
 
 public class Tectonics : MonoBehaviour
 {
@@ -13,8 +16,10 @@ public class Tectonics : MonoBehaviour
     RenderTexture PlateResult;
     RenderTexture HeightMap;
 
-    GameObject terrain;
+    public Terrain terrain;
     TerrainData terrainData;
+
+
 
     public Material material;
     public MeshRenderer mr;
@@ -27,6 +32,7 @@ public class Tectonics : MonoBehaviour
     Point[] plates;
     Point[] points;
     Vector4[] colours;
+    float[,] terrainHeights;
 
     int initPlateKernel;
     int jumpFillKernel;
@@ -52,7 +58,7 @@ public class Tectonics : MonoBehaviour
         plates = new Point[plateAmount];
         points = new Point[PlateTracker.width * PlateTracker.height];
         colours = new Vector4[plateAmount];
-
+        terrainHeights = new float[mapWidth+1, mapHeight+1];
 
         for (int i = 0; i < plateAmount; i++)
         {
@@ -116,10 +122,46 @@ public class Tectonics : MonoBehaviour
         TestWorldColours();
         SetHeightMap();
 
-        CreateTerrain();
+        for(int i = 0; i < mapWidth+1; i++)
+        {
+            for(int j= 0; j < mapHeight+1; j++)
+            {
+                int j2 = j;
+                int i2 = i;
+                if(i == mapWidth)
+                {
+                    i2--;
+                }
+                if(j == mapHeight)
+                {
+                    j2--;
+                }
+                int k = j2 + mapWidth * i2;
+
+                terrainHeights[i, j] = RemapAndGreyscale(points[k].elevation);                
+            }
+        }
+        
+        terrain.terrainData.SetHeights(0, 0, terrainHeights);
+       // CreateTerrain();
         //SaveTextureToFileUtility.SaveTextureToFile(PlateResult, "Assets/Textures/PlateColours.png", -1, -1);
         // SaveTextureToFileUtility.SaveTextureToFile(HeightMap, "Assets/Textures/HeightMap.png", -1, -1);        
     }
+
+/*    private void Update()
+    {
+        for (int i = 0; i < 10; i++)
+        {
+            for (int j = 0; j < 10; j++)
+            {               
+                int k = (j+128 + mapWidth * (i+128));
+
+                terrainHeights[i+128, j+128] += 0.001f;
+            }
+        }
+        terrain.terrainData.SetHeights(0, 0, terrainHeights);
+    }*/
+
 
     private void OnDisable()
     {
@@ -239,6 +281,15 @@ public class Tectonics : MonoBehaviour
         mr.sharedMaterial.SetTexture("_BaseMap", PlateResult);
     }
 
+    float RemapAndGreyscale(float value)
+    {
+        float low2 = 0;
+        float high2 = 1;
+        float low1 = -1000;
+        float high1 = 1000;
+        return low2 + (value - low1) * (high2 - low2) / (high1 - low1);
+    }
+
     void CreateTerrain()
     {
         Texture2D hMap = new Texture2D(mapWidth, mapHeight, TextureFormat.RGB24, false);
@@ -255,6 +306,7 @@ public class Tectonics : MonoBehaviour
             for (int j = 0; j < 250; j++)
             {
                 //Add each new vertex in the plane
+                //verts.Add(new Vector3(i, RemapAndGreyscale(points[j + mapWidth * i].elevation) * 100, j));
                 verts.Add(new Vector3(i, hMap.GetPixel(i, j).grayscale * 100, j));
                 //Skip if a new square on the plane hasn't been formed
                 if (i == 0 || j == 0) continue;
@@ -276,6 +328,7 @@ public class Tectonics : MonoBehaviour
         plane.AddComponent<MeshFilter>();
         plane.AddComponent<MeshRenderer>();
         Mesh procMesh = new Mesh();
+        plane.name = "heightMapMesh";
         procMesh.vertices = verts.ToArray(); //Assign verts, uvs, and tris to the mesh
         procMesh.uv = uvs;
         procMesh.RecalculateUVDistributionMetric(0);
@@ -285,6 +338,24 @@ public class Tectonics : MonoBehaviour
         MeshRenderer mrp = plane.GetComponent<MeshRenderer>();
         mrp.sharedMaterial = material;
         mrp.sharedMaterial.SetTexture("_BaseMap", PlateResult);
+
+        if (procMesh != null)
+        {
+            string meshName = Path.GetFileNameWithoutExtension(plane.name);
+            string localPath = Path.Combine("Assets", "Meshes", meshName);
+            Directory.CreateDirectory(localPath);
+
+            var filters = plane.GetComponentsInChildren<MeshFilter>();
+            foreach (var filter in filters)
+            {
+                var id = filter.sharedMesh.GetInstanceID();
+                AssetDatabase.CreateAsset(filter.sharedMesh, Path.Combine(localPath, id + ".asset"));
+            }
+
+            localPath = AssetDatabase.GenerateUniqueAssetPath(localPath + ".prefab");
+
+            PrefabUtility.SaveAsPrefabAssetAndConnect(plane, localPath, InteractionMode.UserAction);
+        }
     }
 
 }

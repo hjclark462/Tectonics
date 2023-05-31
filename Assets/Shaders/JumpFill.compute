@@ -242,3 +242,33 @@ void TestWorldColours(uint3 id : SV_DispatchThreadID)
 		PlateResult[id.xy] = float4(0, 0, elevation, 1);
 	}
 }
+
+//bool OutOfBounds(Point p)
+//{
+//	int2 coord = (p.pixel + p.direction)
+//		if (coord.x < 0 || coord.x > width || coord.y < 0 || coord.y > height)
+//		{
+//			return true;
+//		}
+//		else {
+//			return false;
+//		}
+//}
+//
+//[numthreads(8, 8, 1)]
+//void TectonicShift(uint3 id : SV_DispatchThreadID)
+//{
+//	int pos = width * id.x + id.y;
+//	int pos1 = width * (id.x + points[pos].direction.x) + (id.y + points[pos].direction.y);
+//	if (OutOfBounds(points[pos]))
+//	{
+//		return;
+//	}
+//	else
+//	{
+//		PointData dest =  points[pos1];
+//
+//			float elevation = points[pos].elevation
+//			points[pos].elevation =
+//	}
+//}
