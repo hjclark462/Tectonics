@@ -20,7 +20,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: New Material
+  m_Name: Water
   m_Shader: {fileID: -6465566751694194690, guid: a4e9914efe170e341add7263d4d3b681, type: 3}
   m_ValidKeywords:
   - _RIPPLE_ON
@@ -38,7 +38,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: 906487fd1d6052f498086053377ba4e1, type: 3}
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Base_Map:
@@ -125,9 +125,9 @@ Material:
     - _QueueOffset: 0
     - _RIPPLE: 1
     - _ReceiveShadows: 1
-    - _Ripple_Amplitude: 0.1
-    - _Ripple_Period: 0.1
-    - _Ripple_Speed: 0.25
+    - _Ripple_Amplitude: 0.5
+    - _Ripple_Period: 0.5
+    - _Ripple_Speed: 0.5
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
@@ -141,6 +141,6 @@ Material:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _Ripple_Origin: {r: 9.15, g: 0, b: 10, a: 0}
+    - _Ripple_Origin: {r: 1, g: 0, b: 10, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []

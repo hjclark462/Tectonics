@@ -24,6 +24,8 @@ RWTexture2D<float4> HeightMap;
 RWStructuredBuffer<PointData> plates;
 RWStructuredBuffer<PointData> points;
 StructuredBuffer<float4> colours;
+int maxHeight;
+int minHeight;
 int width;
 int height;
 int step;
@@ -58,7 +60,7 @@ float invLerp(float from, float to, float value)
 // Remap the elevation from the larger range to a 0 - 1 value.
 float RemapElevation(float elevation)
 {
-	float adjustedElevation = invLerp(-1000, 1000, elevation);
+	float adjustedElevation = invLerp(minHeight, maxHeight, elevation);
 	return lerp(0, 1, adjustedElevation);
 }
 
@@ -223,52 +225,55 @@ void TestWorldColours(uint3 id : SV_DispatchThreadID)
 
 	if (elevation >= 0.95)
 	{
-		PlateResult[id.xy] = float4(elevation, elevation, elevation, 1);
+		PlateResult[id.yx] = float4(elevation, elevation, elevation, 1);
 	}
 	else if (elevation >= 0.75 && elevation < 0.95)
 	{
-		PlateResult[id.xy] = float4(1-elevation, 1-elevation, 1-elevation, 1);
+		PlateResult[id.yx] = float4(1-elevation, 1-elevation, 1-elevation, 1);
 	}
-	else if (elevation >+ 0.52 && elevation < 0.75)
+	else if (elevation >= 0.52 && elevation < 0.75)
 	{
-		PlateResult[id.xy] = float4(0, 1- elevation, 0, 1);
+		PlateResult[id.yx] = float4(0, 1- elevation, 0, 1);
 	}
 	else if (elevation >= 0.5 && elevation < 0.52)
 	{
-		PlateResult[id.xy] = float4(1, 1, elevation, 1);
+		PlateResult[id.yx] = float4(1, 1, elevation, 1);
 	}
 	else if (elevation < 0.5)
 	{
-		PlateResult[id.xy] = float4(0, 0, elevation, 1);
+		PlateResult[id.yx] = float4(0, 0, elevation, 1);
 	}
 }
 
-//bool OutOfBounds(Point p)
-//{
-//	int2 coord = (p.pixel + p.direction)
-//		if (coord.x < 0 || coord.x > width || coord.y < 0 || coord.y > height)
-//		{
-//			return true;
-//		}
-//		else {
-//			return false;
-//		}
-//}
-//
-//[numthreads(8, 8, 1)]
-//void TectonicShift(uint3 id : SV_DispatchThreadID)
-//{
-//	int pos = width * id.x + id.y;
-//	int pos1 = width * (id.x + points[pos].direction.x) + (id.y + points[pos].direction.y);
-//	if (OutOfBounds(points[pos]))
-//	{
-//		return;
-//	}
-//	else
-//	{
-//		PointData dest =  points[pos1];
-//
-//			float elevation = points[pos].elevation
-//			points[pos].elevation =
-//	}
-//}
+bool OutOfBounds(Point p)
+{
+	int2 coord = (p.pixel + p.direction)
+		if (coord.x < 0 || coord.x > width || coord.y < 0 || coord.y > height)
+		{
+			return true;
+		}
+		else {
+			return false;
+		}
+}
+
+[numthreads(8, 8, 1)]
+void TectonicShift(uint3 id : SV_DispatchThreadID)
+{
+	int x1 = id.x + points[pos].direction.x;
+	int y1 = id.y + points[pos].direction.y;
+	int pos = width * id.x + id.y;
+	int pos1 = width * x1 + y1;
+	if (OutOfBounds(points[pos]))
+	{
+		return;
+	}
+	else
+	{
+		if (points[pos].plate == points[pos1].plate)
+		{
+			points[pos1].elevation = points[pos].elevation;
+		}
+	}
+}
+
