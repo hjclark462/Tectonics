@@ -393,14 +393,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_runtime: 1
   m_randomPlates: 0
-  m_mapResolution: 256
-  m_baseMapResolution: 0
-  m_detailMapResolution: 0
+  m_mapResolution: 128
+  m_baseMapResolution: 128
+  m_detailMapResolution: 128
   m_plateObjects: []
-  m_heightScale: 5
+  m_heightScale: 100
   m_maxElevation: 1000
   m_minElevation: -1000
-  m_mapLength: 256
+  m_mapLength: 128
   smoothAmount: 100
   plateAmount: 16
   material: {fileID: 2100000, guid: adb90293968cd194fbbd9e9e2c8dd8ad, type: 2}

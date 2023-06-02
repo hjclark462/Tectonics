@@ -4,11 +4,11 @@ using UnityEngine;
 
 [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
 public struct Point
-{
-    // XY Coordinates Z elevation W plateNumber
-    public Vector2Int pixel;
-    public float elevation;
-    public int plate;
+{    
+    public Vector2Int position;
     public int plateType;
+    public int plate;
+    public int area;
+    public float elevation;
     public Vector2Int direction;
 }

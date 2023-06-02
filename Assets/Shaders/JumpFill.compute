@@ -6,6 +6,7 @@
 #pragma kernel SmoothElevation
 #pragma kernel SetHeightMap
 #pragma kernel TestWorldColours
+#pragma kernel TectonicShift
 
 struct PointData
 {
@@ -55,13 +56,6 @@ void PointOnPlate(float2 current, float3 target, inout float4 minInfo)
 float invLerp(float from, float to, float value)
 {
 	return (value - from) / (to - from);
-}
-
-// Remap the elevation from the larger range to a 0 - 1 value.
-float RemapElevation(float elevation)
-{
-	float adjustedElevation = invLerp(minHeight, maxHeight, elevation);
-	return lerp(0, 1, adjustedElevation);
 }
 
 // Assign the generated plates to a co-ordinate on the texture for use in the JFA
@@ -213,7 +207,7 @@ void SmoothElevation(uint3 id : SV_DispatchThreadID)
 [numthreads(8, 8, 1)]
 void SetHeightMap(uint3 id : SV_DispatchThreadID)
 {
-	float elevation = RemapElevation(PlateTracker[id.xy].z);
+	float elevation = PlateTracker[id.xy].z;
 	HeightMap[id.xy] = float4(elevation, elevation, elevation, 1);
 }
 
@@ -221,7 +215,7 @@ void SetHeightMap(uint3 id : SV_DispatchThreadID)
 [numthreads(8, 8, 1)]
 void TestWorldColours(uint3 id : SV_DispatchThreadID)
 {
-	float elevation = RemapElevation(PlateTracker[id.xy].z);
+	float elevation = PlateTracker[id.xy].z;
 
 	if (elevation >= 0.95)
 	{
@@ -245,9 +239,9 @@ void TestWorldColours(uint3 id : SV_DispatchThreadID)
 	}
 }
 
-bool OutOfBounds(Point p)
+bool OutOfBounds(int2 p, int2 d)
 {
-	int2 coord = (p.pixel + p.direction)
+	int2 coord = (p + d);
 		if (coord.x < 0 || coord.x > width || coord.y < 0 || coord.y > height)
 		{
 			return true;
@@ -260,19 +254,27 @@ bool OutOfBounds(Point p)
 [numthreads(8, 8, 1)]
 void TectonicShift(uint3 id : SV_DispatchThreadID)
 {
+	int pos = width * id.x + id.y;
 	int x1 = id.x + points[pos].direction.x;
 	int y1 = id.y + points[pos].direction.y;
-	int pos = width * id.x + id.y;
 	int pos1 = width * x1 + y1;
-	if (OutOfBounds(points[pos]))
+	if (OutOfBounds(points[pos].pixel, points[pos].direction))
 	{
 		return;
 	}
 	else
 	{
+		int2 dir = points[pos].direction;
+		int2 dir1 = points[pos1].direction;
 		if (points[pos].plate == points[pos1].plate)
 		{
-			points[pos1].elevation = points[pos].elevation;
+			PlateTracker[uint2(x1, y1)] = float4(points[pos1].pixel, points[pos].elevation, 1);
+		}
+		else
+		{
+			float difference = points[pos1].elevation - points[pos].elevation;
+			float scale = dot(dir, dir1) / normalize(dir1);			
+			PlateTracker[uint2(x1, y1)] = float4(points[pos1].pixel, points[pos].elevation + (difference * scale), 1);
 		}
 	}
 }
