@@ -3,18 +3,25 @@
 #pragma kernel JumpFill
 #pragma kernel TestJFAColours
 #pragma kernel SetPointData
+#pragma kernel SetPointDataTS
 #pragma kernel SmoothElevation
 #pragma kernel SetHeightMap
 #pragma kernel TestWorldColours
 #pragma kernel TectonicShift
+#pragma kernel GenerateHeatMap
 
 struct PointData
 {
-	int2 pixel;
-	float elevation;
-	int plate;
-	int plateType;
+	int2 position;	
+	int area;
 	int2 direction;
+	int alive;
+	int colliding;
+	float mass;
+	float thickness;
+	float density;
+	float height;	
+	int plateNum;
 };
 
 RWTexture2D<float4> JFACalculation;
@@ -22,6 +29,7 @@ RWTexture2D<float4> JFAResult;
 RWTexture2D<float4> PlateTracker;
 RWTexture2D<float4> PlateResult;
 RWTexture2D<float4> HeightMap;
+RWTexture2D<float4> HeatMap;
 RWStructuredBuffer<PointData> plates;
 RWStructuredBuffer<PointData> points;
 StructuredBuffer<float4> colours;
@@ -39,7 +47,7 @@ uint2 ClampToTexture(uint2 p)
 	return uint2(x, y);
 }
 
-// Checks if the target point has a plate associated with it already and if it does whether its plate closer
+// Checks if the target point has a plate associated with it already and if it does whether its plate is closer
 // is closer than the current one
 void PointOnPlate(float2 current, float3 target, inout float4 minInfo)
 {
@@ -53,23 +61,18 @@ void PointOnPlate(float2 current, float3 target, inout float4 minInfo)
 	}
 }
 
-float invLerp(float from, float to, float value)
-{
-	return (value - from) / (to - from);
-}
-
 // Assign the generated plates to a co-ordinate on the texture for use in the JFA
-// Texture XY is co-ords Z is Plate ID + 1 so that 0 can be used as NULL
+// Texture XY is co-ords Z is plateNum ID + 1 so that 0 can be used as NULL
 [numthreads(1, 1, 1)]
 void InitPlate(uint3 id : SV_DispatchThreadID)
 {
-	int2 InitPlatePos = plates[id.x].pixel;
+	int2 InitPlatePos = plates[id.x].position;
 	uint px = uint(InitPlatePos.x);
 	uint py = uint(InitPlatePos.y);
 	JFACalculation[uint2(px, py)] = float4(px, py, id.x + 1, 1);
 }
 
-// Check the neighbours in 8 directions and the current point to determine the closest plate to attact the poin to
+// Check the neighbours in 8 directions and the current point to determine the closest plateNum to attact the poin to
 [numthreads(8, 8, 1)]
 void JumpFill(uint3 id : SV_DispatchThreadID)
 {
@@ -120,8 +123,16 @@ void SetPointData(uint3 id : SV_DispatchThreadID)
 	int pos = width * id.x + id.y;
 	float4 info = JFACalculation[id.xy];
 	points[pos] = plates[info.z];
-	points[pos].pixel = id.xy;
-	PlateTracker[id.xy] = float4(points[pos].pixel, points[pos].elevation, 1);
+	points[pos].position = id.xy;
+	PlateTracker[id.xy] = float4(points[pos].position, points[pos].height, 1);
+}
+
+[numthreads(8, 8, 1)]
+void SetPointDataTS(uint3 id : SV_DispatchThreadID)
+{
+	int pos = width * id.x + id.y;
+	float4 info = PlateTracker[id.xy];
+	points[pos].height = info.z;
 }
 
 // Find the average of the current position and its neighbours elevations to smooth the initial JFA calculation
@@ -199,8 +210,8 @@ void SmoothElevation(uint3 id : SV_DispatchThreadID)
 			PlateTracker[uint2(id.x - 1, id.y)].z + PlateTracker[id.xy].z + PlateTracker[uint2(id.x + 1, id.y)].z +
 			PlateTracker[uint2(id.x - 1, id.y + 1)].z + PlateTracker[uint2(id.x, id.y + 1)].z + PlateTracker[uint2(id.x + 1, id.y + 1)].z) / 9;
 	}
-	points[pos].elevation = elevation;
-	PlateResult[id.xy] = float4(points[pos].pixel, points[pos].elevation, 1);
+	points[pos].height = elevation;
+	PlateResult[id.xy] = float4(points[pos].position, points[pos].height, 1);
 }
 
 // Set texture colours to a shade of white to generate a height map
@@ -223,7 +234,7 @@ void TestWorldColours(uint3 id : SV_DispatchThreadID)
 	}
 	else if (elevation >= 0.75 && elevation < 0.95)
 	{
-		PlateResult[id.yx] = float4(1-elevation, 1-elevation, 1-elevation, 1);
+		PlateResult[id.yx] = float4(1- elevation, 1- elevation, 1- elevation, 1);
 	}
 	else if (elevation >= 0.52 && elevation < 0.75)
 	{
@@ -252,29 +263,49 @@ bool OutOfBounds(int2 p, int2 d)
 }
 
 [numthreads(8, 8, 1)]
+void GenerateHeatMap(uint3 id : SV_DispatchThreadID)
+{
+	float4 info = JFACalculation[id.xy];
+	float intensity = 1 - exp(-sqrt(info.w) * 0.01);
+	HeatMap[id.xy] = float4(intensity, intensity, intensity, 1);
+}
+
+void Buoyancy(int i)
+{
+	points[i].density = points[i].mass / (points[i].area * points[i].thickness);
+	points[i].height = points[i].thickness * (1 - points[i].density);
+}
+
+float Greyscale(float value)
+{
+	return (0.299f * value) + (0.587f * value) + (0.114f * value);
+}
+
+[numthreads(8, 8, 1)]
 void TectonicShift(uint3 id : SV_DispatchThreadID)
 {
 	int pos = width * id.x + id.y;
 	int x1 = id.x + points[pos].direction.x;
 	int y1 = id.y + points[pos].direction.y;
 	int pos1 = width * x1 + y1;
-	if (OutOfBounds(points[pos].pixel, points[pos].direction))
+	if (OutOfBounds(points[pos].position, points[pos].direction))
 	{
+		points[pos].alive = 0;
 		return;
 	}
 	else
 	{
 		int2 dir = points[pos].direction;
 		int2 dir1 = points[pos1].direction;
-		if (points[pos].plate == points[pos1].plate)
+		float difference = (points[pos1].height - points[pos].height) * Greyscale(HeatMap[uint2(x1, y1)]);
+		if (points[pos].plateNum == points[pos1].plateNum)
 		{
-			PlateTracker[uint2(x1, y1)] = float4(points[pos1].pixel, points[pos].elevation, 1);
+			return;
 		}
 		else
 		{
-			float difference = points[pos1].elevation - points[pos].elevation;
 			float scale = dot(dir, dir1) / normalize(dir1);			
-			PlateTracker[uint2(x1, y1)] = float4(points[pos1].pixel, points[pos].elevation + (difference * scale), 1);
+			PlateTracker[uint2(x1, y1)] = float4(points[pos1].position, points[pos].height + (difference * scale), 1);			
 		}
 	}
 }
