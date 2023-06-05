@@ -75,8 +75,7 @@ public class Tectonics : MonoBehaviour
     int tectonicShiftKernel;
 
     int threadGroupsX;
-    int threadGroupsY;
-    int idebugcouidsa = 0;
+    int threadGroupsY;   
 
     void Start()
     {
@@ -88,10 +87,7 @@ public class Tectonics : MonoBehaviour
 
     private void Update()
     {
-        for (int i = 0; i < plates.Length; i++)
-        {
-
-        }
+        
     }
 
 
