@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using TectonicEnums;
+using TectonicValues;
 using UnityEngine;
 
 [RequireComponent(typeof(Terrain), typeof(TerrainData))]
@@ -7,6 +7,7 @@ public class Tectonics : MonoBehaviour
 {
     [SerializeField]
     public bool m_runtime = false;
+    int counter = 0;
 
     [SerializeField]
     public bool m_randomPlates = false;
@@ -85,10 +86,6 @@ public class Tectonics : MonoBehaviour
         }
     }
 
-    private void Update()
-    {
-        
-    }
 
 
     private void OnDisable()
@@ -152,6 +149,43 @@ public class Tectonics : MonoBehaviour
         //SaveTextureToFileUtility.SaveTextureToFile(HeightMap, "Assets/Textures/HeightMap.png", -1, -1);        
     }
 
+    private void Update()
+    {
+        if (m_runtime)
+        {
+            for (int i = 0; i < plates.Length; i++)
+            {
+                points = plates[i].Update(points, terrainHeights, plateAmount, (int)m_mapResolution);
+            }
+            for (int i = 0; i < (int)m_mapResolution + 1; i++)
+            {
+                for (int j = 0; j < (int)m_mapResolution + 1; j++)
+                {
+                    int j2 = j;
+                    int i2 = i;
+                    if (i == (int)m_mapResolution)
+                    {
+                        i2--;
+                    }
+                    if (j == (int)m_mapResolution)
+                    {
+                        j2--;
+                    }
+                    int k = j2 + (int)m_mapResolution * i2;
+
+                    terrainHeights[i, j] = points[k].height;
+                }
+            }
+            terrain.terrainData.SetHeights(0, 0, terrainHeights);
+            terrain.Flush();
+            counter++;
+        }
+        if (counter == 10)
+        {
+            m_runtime = false;
+            counter = 0;
+        }
+    }
     void InitTextures()
     {
         JFACalculation = new RenderTexture((int)m_mapResolution, (int)m_mapResolution, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
