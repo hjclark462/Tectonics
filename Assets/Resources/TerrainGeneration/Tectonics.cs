@@ -95,10 +95,10 @@ public class Tectonics : MonoBehaviour
     int testWorldColoursKernel;    
 
     int threadGroupsX;
-    int threadGroupsY;
+    int threadGroupsY;    
 
     void Start()
-    {
+    {        
         if (m_runtime)
         {
             Terrain.CreateTerrainGameObject(GenerateTerrain());
@@ -166,7 +166,7 @@ public class Tectonics : MonoBehaviour
 
     void InitBuffersKernel()
     {
-        jumpFill = (ComputeShader)Resources.Load("TerrainGenerator/JumpFill");
+        jumpFill = (ComputeShader)Resources.Load("TerrainGeneration/JumpFill");
         terrainHeights = new float[(int)m_heightMapResolution + 1, (int)m_heightMapResolution + 1];
         points = new Point[PlateTracker.width * PlateTracker.height];
 
@@ -304,7 +304,7 @@ public class Tectonics : MonoBehaviour
         jumpFill.Dispatch(jFAColoursKernel, threadGroupsX, threadGroupsY, 1);
         if(m_saveColourMap)
         {
-            TerrainGenerator.SaveTextureToPNG(JFAResult, "Assets/Resources/PlateColours.png", -1, -1);
+            SaveTexture.SaveTextureToPNG(JFAResult, "Assets/Resources/TerrainGeneration/PlateColours.png", -1, -1);
         }
     }
 
@@ -315,7 +315,7 @@ public class Tectonics : MonoBehaviour
         jumpFill.Dispatch(setHeightMapKernel, threadGroupsX, threadGroupsY, 1);
         if (m_saveHeightMap)
         {
-            TerrainGenerator.SaveTextureToPNG(HeightMap, "Assets/Resources/HeightMap.png", -1, -1);
+            SaveTexture.SaveTextureToPNG(HeightMap, "Assets/Resources/TerrainGeneration/HeightMap.png", -1, -1);
         }
     }
     void TestWorldColours()

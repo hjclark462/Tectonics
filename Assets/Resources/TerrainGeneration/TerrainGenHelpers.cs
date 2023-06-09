@@ -3,14 +3,6 @@ using UnityEditor;
 using Unity.Collections;
 using UnityEngine.Rendering;
 
-[CreateAssetMenu(menuName = "Terrain Generator/Plate")]
-public class PlateSO : ScriptableObject
-{
-    public Vector2Int coordinate;
-    public float elevation;
-    public Color color;
-}
-
 namespace TerrainGenHelpers
 {
     public enum TerrainResolutions
@@ -27,31 +19,9 @@ namespace TerrainGenHelpers
 
 }
 
-public class TerrainGenerator
-{
-    [MenuItem("Terrain Generator/Generate Terrain")]
-    private static void GenerateTerrain()
-    {
-        var terrain = GameObject.FindObjectOfType<Terrain>();
-        if (terrain != null)
-        {
-            GameObject.DestroyImmediate(terrain.gameObject, true);
-        }
-        var generator = GameObject.FindObjectOfType<Tectonics>();
-        if (generator != null)
-        {
-            Terrain.CreateTerrainGameObject(generator.GenerateTerrain());
-            generator.CleanUp();
-        }
-        else
-        {
-            GameObject tec = new GameObject("Terrain Generator");
-            tec.AddComponent<Tectonics>();
-            Terrain.CreateTerrainGameObject(tec.GetComponent<Tectonics>().GenerateTerrain());
-            tec.GetComponent<Tectonics>().CleanUp();
-        }
-    }
 
+public class SaveTexture
+{ 
     static public void SaveTextureToPNG(Texture source,
                                         string filePath,
                                         int width,
