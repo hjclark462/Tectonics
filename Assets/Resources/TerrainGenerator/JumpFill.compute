@@ -1,0 +1,204 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel InitPlate
+#pragma kernel JumpFill
+#pragma kernel TestJFAColours
+#pragma kernel SetPointData
+#pragma kernel SmoothElevation
+#pragma kernel SetHeightMap
+
+struct PointData
+{
+	int2 pixel;
+	int plateType;
+	int plate;
+	float elevation;	
+};
+
+RWTexture2D<float4> JFACalculation;
+RWTexture2D<float4> JFAResult;
+RWTexture2D<float4> PlateTracker;
+RWTexture2D<float4> PlateResult;
+RWTexture2D<float4> HeightMap;
+RWStructuredBuffer<PointData> plates;
+RWStructuredBuffer<PointData> points;
+StructuredBuffer<float4> colours;
+int maxHeight;
+int minHeight;
+int width;
+int height;
+int step;
+
+// Clamps the flood fill so that it won't overflow the bounds of the RenderTexture
+uint2 ClampToTexture(uint2 p)
+{
+	uint x = clamp(p.x, 0, width);
+	uint y = clamp(p.y, 0, height);
+	return uint2(x, y);
+}
+
+// Checks if the target point has a plate associated with it already and if it does whether its plate closer
+// is closer than the current one
+void PointOnPlate(float2 current, float3 target, inout float4 minInfo)
+{
+	if (target.z > 0)
+	{
+		float distance = dot(current - target.xy, current - target.xy);
+		if (distance < minInfo.w)
+		{
+			minInfo = float4(target, distance);
+		}
+	}
+}
+
+// Assign the generated plates to a co-ordinate on the texture for use in the JFA
+// Texture XY is co-ords Z is Plate ID + 1 so that 0 can be used as NULL
+[numthreads(1, 1, 1)]
+void InitPlate(uint3 id : SV_DispatchThreadID)
+{
+	int2 InitPlatePos = plates[id.x].pixel;
+	uint px = uint(InitPlatePos.x);
+	uint py = uint(InitPlatePos.y);
+	JFACalculation[uint2(px, py)] = float4(px, py, id.x + 1, 1);
+}
+
+// Check the neighbours in 8 directions and the current point to determine the closest plate to attach the point to
+[numthreads(8, 8, 1)]
+void JumpFill(uint3 id : SV_DispatchThreadID)
+{
+	float4 minInfo = float4(0, 0, 0, 999999);
+
+	PointOnPlate(id.xy, JFACalculation[id.xy].xyz, minInfo);
+
+	PointOnPlate(id.xy, JFACalculation[ClampToTexture(id.xy + uint2(-step, -step))].xyz, minInfo);
+
+	PointOnPlate(id.xy, JFACalculation[ClampToTexture(id.xy + uint2(-step, step))].xyz, minInfo);
+
+	PointOnPlate(id.xy, JFACalculation[ClampToTexture(id.xy + uint2(-step, 0))].xyz, minInfo);
+
+	PointOnPlate(id.xy, JFACalculation[ClampToTexture(id.xy + uint2(0, -step))].xyz, minInfo);
+
+	PointOnPlate(id.xy, JFACalculation[ClampToTexture(id.xy + uint2(0, step))].xyz, minInfo);
+
+	PointOnPlate(id.xy, JFACalculation[ClampToTexture(id.xy + uint2(step, -step))].xyz, minInfo);
+
+	PointOnPlate(id.xy, JFACalculation[ClampToTexture(id.xy + uint2(step, 0))].xyz, minInfo);
+
+	PointOnPlate(id.xy, JFACalculation[ClampToTexture(id.xy + uint2(step, step))].xyz, minInfo);
+
+	JFAResult[id.xy] = minInfo;
+}
+
+// Colour Debugging to be removed
+[numthreads(8, 8, 1)]
+void TestJFAColours(uint3 id : SV_DispatchThreadID)
+{
+	float4 info = JFACalculation[id.xy];
+	if (info.w < 10)
+	{
+		// Render the seed that the flood fill generated from as a red dot
+		JFAResult[id.xy] = float4(1, 0, 0, 1);
+	}
+	else
+	{
+		uint seedID = info.z;
+		JFAResult[id.xy] = float4(colours[seedID - 1]);
+	}
+}
+
+// Set the data from the JFA calculation to a CPU side array so that Unity TerrainData can be generated. 
+[numthreads(8, 8, 1)]
+void SetPointData(uint3 id : SV_DispatchThreadID)
+{
+	int pos = width * id.x + id.y;
+	float4 info = JFACalculation[id.xy];
+	points[pos] = plates[info.z];
+	points[pos].pixel = id.xy;
+	PlateTracker[id.xy] = float4(points[pos].pixel, points[pos].elevation, 1);
+}
+
+// Find the average of the current position and its neighbours elevations to smooth the initial JFA calculation
+// accounting for whether it is a border position or not
+[numthreads(8, 8, 1)]
+void SmoothElevation(uint3 id : SV_DispatchThreadID)
+{
+	int pos = width * id.x + id.y;
+	float elevation;
+	uint2 current = PlateTracker[id.xy].xy;
+
+	if (current.x == 0)
+	{
+		// Top Left corner
+		if (current.y == 0)
+		{
+			elevation = (PlateTracker[id.xy].z + PlateTracker[uint2(id.x + 1, id.y)].z +
+				PlateTracker[uint2(id.x, id.y + 1)].z + PlateTracker[uint2(id.x + 1, id.y + 1)].z) / 4;
+		}
+		// Bottom Left corner
+		else if (current.y == uint(height - 1))
+		{
+			elevation = (PlateTracker[uint2(id.x, id.y - 1)].z + PlateTracker[uint2(id.x + 1, id.y - 1)].z +
+				PlateTracker[id.xy].z + PlateTracker[uint2(id.x + 1, id.y)].z) / 4;
+		}
+		// Left Edge
+		else
+		{
+			elevation = (PlateTracker[uint2(id.x, id.y - 1)].z + PlateTracker[uint2(id.x + 1, id.y - 1)].z +
+				PlateTracker[id.xy].z + PlateTracker[uint2(id.x + 1, id.y)].z +
+				PlateTracker[uint2(id.x, id.y + 1)].z + PlateTracker[uint2(id.x + 1, id.y + 1)].z) / 6;
+		}
+	}
+	else if (current.y == 0)
+	{
+		// Top Right Corner
+		if (current.x == uint(width - 1))
+		{
+			elevation = (PlateTracker[uint2(id.x - 1, id.y)].z + PlateTracker[id.xy].z +
+				PlateTracker[uint2(id.x - 1, id.y + 1)].z + PlateTracker[uint2(id.x, id.y + 1)].z) / 4;
+		}
+		// Top Edge
+		else
+		{
+			elevation = (PlateTracker[uint2(id.x - 1, id.y)].z + PlateTracker[id.xy].z + PlateTracker[uint2(id.x + 1, id.y)].z +
+				PlateTracker[uint2(id.x - 1, id.y + 1)].z + PlateTracker[uint2(id.x, id.y + 1)].z + PlateTracker[uint2(id.x + 1, id.y + 1)].z) / 6;
+		}
+	}
+	else if (current.x == uint(width - 1))
+	{
+		// Bottom Right Corner
+		if (current.y == uint(height - 1))
+		{
+			elevation = (PlateTracker[uint2(id.x - 1, id.y - 1)].z + PlateTracker[uint2(id.x, id.y - 1)].z +
+				PlateTracker[uint2(id.x - 1, id.y)].z + PlateTracker[id.xy].z) / 4;
+		}
+		// Right Edge
+		else
+		{
+			elevation = (PlateTracker[uint2(id.x - 1, id.y - 1)].z + PlateTracker[uint2(id.x, id.y - 1)].z +
+				PlateTracker[uint2(id.x - 1, id.y)].z + PlateTracker[id.xy].z +
+				PlateTracker[uint2(id.x - 1, id.y + 1)].z + PlateTracker[uint2(id.x, id.y + 1)].z) / 6;
+		}
+	}
+	// Bottom Edge
+	else if (current.y == uint(height - 1))
+	{
+		elevation = (PlateTracker[uint2(id.x - 1, id.y - 1)].z + PlateTracker[uint2(id.x, id.y - 1)].z + PlateTracker[uint2(id.x + 1, id.y - 1)].z +
+			PlateTracker[uint2(id.x - 1, id.y)].z + PlateTracker[id.xy].z + PlateTracker[uint2(id.x + 1, id.y)].z) / 6;
+	}
+	// Central Position
+	else
+	{
+		elevation = (PlateTracker[uint2(id.x - 1, id.y - 1)].z + PlateTracker[uint2(id.x, id.y - 1)].z + PlateTracker[uint2(id.x + 1, id.y - 1)].z +
+			PlateTracker[uint2(id.x - 1, id.y)].z + PlateTracker[id.xy].z + PlateTracker[uint2(id.x + 1, id.y)].z +
+			PlateTracker[uint2(id.x - 1, id.y + 1)].z + PlateTracker[uint2(id.x, id.y + 1)].z + PlateTracker[uint2(id.x + 1, id.y + 1)].z) / 9;
+	}
+	points[pos].elevation = elevation;
+	PlateResult[id.xy] = float4(points[pos].pixel, points[pos].elevation, 1);
+}
+
+// Set texture colours to a shade of white to generate a height map
+[numthreads(8, 8, 1)]
+void SetHeightMap(uint3 id : SV_DispatchThreadID)
+{
+	float elevation = PlateTracker[id.xy].z;
+	HeightMap[id.xy] = float4(elevation, elevation, elevation, 1);
+}
