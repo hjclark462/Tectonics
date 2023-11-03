@@ -25,11 +25,14 @@ public class Player : MonoBehaviour
 
     bool showMouse = false;
 
+    Tectonics tectonics;
+
     public Button reset;
     public Button quit;
 
     void Start()
     {
+        tectonics = FindObjectOfType<Tectonics>();
         Cursor.lockState = CursorLockMode.Locked;
         reset.onClick.AddListener(ResetApp);
         quit.onClick.AddListener(QuitApp);
@@ -81,7 +84,7 @@ public class Player : MonoBehaviour
 
     private void ResetApp()
     {
-        SceneManager.LoadScene(0);
+        tectonics.terrain.terrainData = tectonics.GenerateTerrain();
     }
     private void QuitApp()
     {
