@@ -116,8 +116,8 @@ public class Tectonics : MonoBehaviour
     }
 
     private void Update()
-    {        
-        terrain.terrainData = UpdateTerrain();                
+    {
+        terrain.terrainData = UpdateTerrain();
     }
 
     public void CleanUp()
@@ -125,14 +125,14 @@ public class Tectonics : MonoBehaviour
         plateBuffer.Release();
         pointBuffer.Release();
         colourBuffer.Release();
-        /* JFACalculation.Release();
-         JFAResult.Release();
-         PlateTracker.Release();
-         PlateResult.Release();
-         HeightMap.Release();
-         plateBuffer = null;
-         pointBuffer = null;
-         colourBuffer = null;*/
+        JFACalculation.Release();
+        JFAResult.Release();
+        PlateTracker.Release();
+        PlateResult.Release();
+        HeightMap.Release();
+        plateBuffer = null;
+        pointBuffer = null;
+        colourBuffer = null;
     }
 
     public TerrainData GenerateTerrain()
@@ -161,7 +161,8 @@ public class Tectonics : MonoBehaviour
 
     public TerrainData UpdateTerrain()
     {
-        InitBuffersKernel();
+        UpdateTextures();
+            InitBuffersKernel();
         InitPlateSeeds();
         JumpFloodAlgorithm();
         GetPointData();
@@ -179,6 +180,19 @@ public class Tectonics : MonoBehaviour
         CleanUp();
         terrainCollider.terrainData = tData;
         return tData;
+    }
+
+    void UpdateTextures()
+    {
+        JFACalculation.Create();
+        JFACalculation.Create();
+        JFAResult.Create();
+        PlateTracker.Create();
+        PlateResult.Create();
+        HeightMap.Create();
+
+        threadGroupsX = Mathf.CeilToInt(JFACalculation.width / 8.0f);
+        threadGroupsY = Mathf.CeilToInt(JFACalculation.height / 8.0f);
     }
 
     void InitTextures()
@@ -211,14 +225,14 @@ public class Tectonics : MonoBehaviour
     void InitBuffersKernel()
     {
         jumpFill = (ComputeShader)Resources.Load("TerrainGeneration/JumpFill");
-        terrainHeights = new float[(int)m_heightMapResolution + 1, (int)m_heightMapResolution + 1];        
+        terrainHeights = new float[(int)m_heightMapResolution + 1, (int)m_heightMapResolution + 1];
         points = new Point[PlateTracker.width * PlateTracker.height];
 
         if (m_randomPlates)
         {
-            if(m_plateObjects.Count > 0)
+            if (m_plateObjects.Count > 0)
             {
-                foreach(PlateSO pso in m_plateObjects)
+                foreach (PlateSO pso in m_plateObjects)
                 {
                     Destroy(pso);
                 }
