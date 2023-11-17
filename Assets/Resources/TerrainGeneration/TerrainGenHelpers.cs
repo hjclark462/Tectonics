@@ -80,4 +80,5 @@ public struct Point
     public int plateType;
     public int plate;
     public float elevation;
+    public Vector2Int direction;
 }

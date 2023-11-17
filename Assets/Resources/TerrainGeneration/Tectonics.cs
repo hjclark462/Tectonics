@@ -1,3 +1,4 @@
+using Palmmedia.ReportGenerator.Core;
 using System.Collections.Generic;
 using TerrainGenHelpers;
 using Unity.VisualScripting;
@@ -18,7 +19,7 @@ public class Tectonics : MonoBehaviour
     [SerializeField]
     [Tooltip("List of Scriptable Objects that can be created from the Asset Menu under Terrain Generator: Plate. If Random Plates " +
         "is unchecked the amount of plates in the generated terrain will be the amount in this list")]
-    List<PlateSO> m_plateObjects;
+    List<PlateSO> m_plateObjects = new List<PlateSO>();
 
     [SerializeField]
     int plateAmount = 12;
@@ -71,7 +72,7 @@ public class Tectonics : MonoBehaviour
     RenderTexture JFAResult;
 
     RenderTexture PlateTracker;
-    RenderTexture PlateResult;
+    RenderTexture PlateResult;   
 
     RenderTexture HeightMap;
 
@@ -96,20 +97,21 @@ public class Tectonics : MonoBehaviour
     int smoothElevationKernel;
     int setHeightMapKernel;
     int testWorldColoursKernel;
+    int updatePlatesKernel;
 
     int threadGroupsX;
     int threadGroupsY;
 
     void Start()
     {
-        if (m_runtime)
+        terrain = GameObject.FindObjectOfType<Terrain>();
+        if (terrain != null)
         {
-            Terrain.CreateTerrainGameObject(GenerateTerrain());
-            CleanUp();
+            terrain.terrainData = GenerateTerrain();
         }
         else
         {
-            InitTextures();
+        Terrain.CreateTerrainGameObject(GenerateTerrain());                
         }
         terrain = Terrain.activeTerrain;
         terrainCollider = terrain.gameObject.GetComponent<TerrainCollider>();
@@ -152,48 +154,31 @@ public class Tectonics : MonoBehaviour
         if (m_saveColourMap)
         {
             GetPlateMap();
-        }
-        CleanUp();
+        }    
         return tData;
     }
 
 
 
     public TerrainData UpdateTerrain()
-    {
-        UpdateTextures();
-            InitBuffersKernel();
-        InitPlateSeeds();
-        JumpFloodAlgorithm();
-        GetPointData();
-        for (int i = 0; i < smoothAmount; i++)
+    {       
+       // GetPointData();
+        UpdatePlates();
+        /*for (int i = 0; i < smoothAmount; i++)
         {
             SmoothElevation();
-        }
+        }*/
         TestWorldColours();
         GetHeightMap();
         SetTerrainData();
         if (m_saveColourMap)
         {
             GetPlateMap();
-        }
-        CleanUp();
+        }       
         terrainCollider.terrainData = tData;
         return tData;
     }
-
-    void UpdateTextures()
-    {
-        JFACalculation.Create();
-        JFACalculation.Create();
-        JFAResult.Create();
-        PlateTracker.Create();
-        PlateResult.Create();
-        HeightMap.Create();
-
-        threadGroupsX = Mathf.CeilToInt(JFACalculation.width / 8.0f);
-        threadGroupsY = Mathf.CeilToInt(JFACalculation.height / 8.0f);
-    }
+  
 
     void InitTextures()
     {
@@ -216,7 +201,7 @@ public class Tectonics : MonoBehaviour
         HeightMap = new RenderTexture((int)m_heightMapResolution, (int)m_heightMapResolution, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
         HeightMap.name = "HeightMap";
         HeightMap.enableRandomWrite = true;
-        HeightMap.Create();
+        HeightMap.Create();        
 
         threadGroupsX = Mathf.CeilToInt(JFACalculation.width / 8.0f);
         threadGroupsY = Mathf.CeilToInt(JFACalculation.height / 8.0f);
@@ -234,7 +219,7 @@ public class Tectonics : MonoBehaviour
             {
                 foreach (PlateSO pso in m_plateObjects)
                 {
-                    Destroy(pso);
+                    DestroyImmediate(pso);
                 }
             }
             m_plateObjects = new List<PlateSO>();
@@ -266,7 +251,7 @@ public class Tectonics : MonoBehaviour
                 }
                 p.elevation = Remap(p.elevation);
                 colours[i] = plateSO.color = new Vector4(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f), 1);
-
+                p.direction = new Vector2Int(Random.Range(-1, 1), Random.Range(-1, 1));
                 plates[i] = p;
                 m_plateObjects.Add(plateSO);
             }
@@ -287,7 +272,7 @@ public class Tectonics : MonoBehaviour
             }
         }
 
-        int pointSize = (sizeof(float) + sizeof(int) * 4);
+        int pointSize = (sizeof(float) + sizeof(int) * 6);
         plateBuffer = new ComputeBuffer(plateAmount, pointSize);
         plateBuffer.SetData(plates);
         pointBuffer = new ComputeBuffer(points.Length + 1, pointSize, ComputeBufferType.Structured, ComputeBufferMode.Immutable);
@@ -301,6 +286,7 @@ public class Tectonics : MonoBehaviour
         smoothElevationKernel = jumpFill.FindKernel("SmoothElevation");
         setHeightMapKernel = jumpFill.FindKernel("SetHeightMap");
         jFAColoursKernel = jumpFill.FindKernel("TestJFAColours");
+        updatePlatesKernel = jumpFill.FindKernel("UpdatePlates");
 
         jumpFill.SetInt("maxHeight", m_maxElevation);
         jumpFill.SetInt("minHeight", m_minElevation);
@@ -418,6 +404,19 @@ public class Tectonics : MonoBehaviour
         tData.baseMapResolution = (int)m_baseMapResolution;
         tData.SetDetailResolution((int)m_detailMapResolution, 16);
         tData.SetHeights(0, 0, terrainHeights);
+    }
+
+    void UpdatePlates()
+    {        
+        pointBuffer.SetData(points);
+        jumpFill.SetBuffer(updatePlatesKernel, "points", pointBuffer);
+       // jumpFill.SetTexture(updatePlatesKernel, "PlateTracker", PlateTracker);
+        jumpFill.SetTexture(updatePlatesKernel, "PlateResult", PlateResult);
+        jumpFill.SetInt("width", PlateTracker.width);
+        jumpFill.SetInt("height", PlateTracker.height);
+        jumpFill.Dispatch(updatePlatesKernel, threadGroupsX, threadGroupsY, 1);
+        pointBuffer.GetData(points);
+        Graphics.Blit(PlateResult, PlateTracker);
     }
 
     // Remap the elevation values to be between 0 and 1;
