@@ -5,6 +5,7 @@
 #pragma kernel SetPointData
 #pragma kernel SmoothElevation
 #pragma kernel SetHeightMap
+#pragma kernel UpdatePlates
 
 struct PointData
 {
@@ -12,6 +13,7 @@ struct PointData
 	int plateType;
 	int plate;
 	float elevation;	
+    int2 direction;
 };
 
 RWTexture2D<float4> JFACalculation;
@@ -19,6 +21,7 @@ RWTexture2D<float4> JFAResult;
 RWTexture2D<float4> PlateTracker;
 RWTexture2D<float4> PlateResult;
 RWTexture2D<float4> HeightMap;
+RWTexture2D<float4> PlateUpdater;
 RWStructuredBuffer<PointData> plates;
 RWStructuredBuffer<PointData> points;
 StructuredBuffer<float4> colours;
@@ -201,4 +204,39 @@ void SetHeightMap(uint3 id : SV_DispatchThreadID)
 {
 	float elevation = PlateTracker[id.xy].z;
 	HeightMap[id.xy] = float4(elevation, elevation, elevation, 1);
+}
+
+[numthreads(8,8,1)]
+void UpdatePlates(uint3 id : SV_DispatchThreadID)
+{
+    int curPos = width * id.x + id.y;
+    int dirX = points[curPos].direction.x;
+    int dirY = points[curPos].direction.y;
+	
+    dirX = dirX + id.x;
+    dirY = dirY + id.y;
+	
+    if (dirX < 0)
+    {
+        dirX = width + dirX;
+    }
+    else if (dirX > width)
+    {
+        dirX = dirX - width;
+    }
+    if (dirY < 0)
+    {
+        dirY = height + dirY;
+    }
+    else if (dirY > height)
+    {
+        dirY = dirY - height;
+    }
+	
+    int nextPos = width * dirX + dirY;	
+    
+    float elevation = points[nextPos].elevation - points[curPos].elevation;
+	
+    points[nextPos].elevation += elevation;
+	PlateResult[id.xy] = float4(points[curPos].pixel, points[curPos].elevation, 1);	
 }

@@ -6,24 +6,31 @@ public class TerrainGenerator : Editor
     [MenuItem("Terrain Generator/Generate Terrain")]
     private static void GenerateTerrain()
     {
+        var generator = CreateGenerator();
         var terrain = GameObject.FindObjectOfType<Terrain>();
         if (terrain != null)
         {
-            GameObject.DestroyImmediate(terrain.gameObject, true);
+            terrain.terrainData = generator.GenerateTerrain();
         }
+        else
+        {
+            Terrain.CreateTerrainGameObject(generator.GenerateTerrain());
+        }
+    }
+
+    static Tectonics CreateGenerator()
+    {
         var generator = GameObject.FindObjectOfType<Tectonics>();
         if (generator != null)
         {
-            Terrain.CreateTerrainGameObject(generator.GenerateTerrain());
-            generator.CleanUp();
+            return generator;            
         }
         else
         {
             GameObject tec = new GameObject("Terrain Generator");
             tec.AddComponent<Tectonics>();
-            Terrain.CreateTerrainGameObject(tec.GetComponent<Tectonics>().GenerateTerrain());
-            tec.GetComponent<Tectonics>().CleanUp();
+            return (tec.GetComponent<Tectonics>());            
         }
-    }
+    }    
 }
 
