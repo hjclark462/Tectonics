@@ -5,6 +5,7 @@
 #pragma kernel SetPointData
 #pragma kernel SmoothElevation
 #pragma kernel SetHeightMap
+#pragma kernel UpdatePoints
 #pragma kernel UpdatePlates
 
 struct PointData
@@ -21,9 +22,9 @@ RWTexture2D<float4> JFAResult;
 RWTexture2D<float4> PlateTracker;
 RWTexture2D<float4> PlateResult;
 RWTexture2D<float4> HeightMap;
-RWTexture2D<float4> PlateUpdater;
 RWStructuredBuffer<PointData> plates;
 RWStructuredBuffer<PointData> points;
+RWStructuredBuffer<PointData> updatedPoints;
 StructuredBuffer<float4> colours;
 int maxHeight;
 int minHeight;
@@ -207,7 +208,7 @@ void SetHeightMap(uint3 id : SV_DispatchThreadID)
 }
 
 [numthreads(8,8,1)]
-void UpdatePlates(uint3 id : SV_DispatchThreadID)
+void UpdatePoints(uint3 id : SV_DispatchThreadID)
 {
     int curPos = width * id.x + id.y;
     int dirX = points[curPos].direction.x;
@@ -218,7 +219,7 @@ void UpdatePlates(uint3 id : SV_DispatchThreadID)
 	
     if (dirX < 0)
     {
-        dirX = width + dirX;
+        dirX = width + dirX;    
     }
     else if (dirX > width)
     {
@@ -233,10 +234,32 @@ void UpdatePlates(uint3 id : SV_DispatchThreadID)
         dirY = dirY - height;
     }
 	
-    int nextPos = width * dirX + dirY;	
+    int nextPos = width * dirX + dirY;	    
     
-    float elevation = points[nextPos].elevation - points[curPos].elevation;
-	
-    points[nextPos].elevation += elevation;
-	PlateResult[id.xy] = float4(points[curPos].pixel, points[curPos].elevation, 1);	
+	if(curPos == nextPos)
+    {
+        updatedPoints[curPos] = points[curPos];
+    }	
+	else if (points[curPos].plate != points[nextPos].plate)
+    {
+        if (points[curPos].plateType >= points[nextPos].plateType)
+        {
+            updatedPoints[nextPos].elevation = points[curPos].elevation + points[nextPos].elevation;
+        }        
+        else
+        {			
+            updatedPoints[nextPos].elevation = points[curPos].elevation - points[nextPos].elevation;
+        }
+    }	
+	else
+    {
+        updatedPoints[nextPos].elevation = points[nextPos].elevation;
+    }    
+}
+
+[numthreads(8, 8, 1)]
+void UpdatePlates(uint3 id : SV_DispatchThreadID)
+{
+    int curPos = width * id.x + id.y;	
+    PlateTracker[id.xy] = float4(updatedPoints[curPos].pixel, updatedPoints[curPos].elevation, 1);
 }

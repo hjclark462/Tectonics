@@ -1245,16 +1245,16 @@ MonoBehaviour:
   - {fileID: 1900177488}
   - {fileID: 912701443}
   - {fileID: 1782113856}
-  plateAmount: 12
-  m_heightMapResolution: 128
-  m_baseMapResolution: 128
-  m_controlMapResolution: 128
-  m_detailMapResolution: 128
-  m_terrainResolution: 128
+  plateAmount: 3
+  m_heightMapResolution: 32
+  m_baseMapResolution: 32
+  m_controlMapResolution: 32
+  m_detailMapResolution: 32
+  m_terrainResolution: 32
   m_heightScale: 100
-  m_maxElevation: 1000
-  m_minElevation: -1000
-  smoothAmount: 100
+  m_maxElevation: 100
+  m_minElevation: -110
+  smoothAmount: 10
   m_saveColourMap: 0
   m_saveHeightMap: 0
   terrain: {fileID: 0}
