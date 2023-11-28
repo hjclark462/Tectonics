@@ -54,6 +54,9 @@ public class Tectonics : MonoBehaviour
     [Tooltip("Bottom of range of height values to spread from. Will translate to 0 on the height map")]
     int m_minElevation = -1000;
 
+    float m_minFloat = 0f;
+    float m_maxFloat = 1f;
+
     [SerializeField]
     [Tooltip("The amount of smoothing on the terrain after the spreading of the plates. The higher the value the longer" +
         "the processing time on generation can become")]
@@ -159,12 +162,15 @@ public class Tectonics : MonoBehaviour
         return tData;
     }
 
-
+    int smooth = 0;
 
     public TerrainData UpdateTerrain()
     {
         UpdatePoints();
-        UpdatePlates();
+        UpdatePlates();        
+
+        SmoothElevation();
+
         TestWorldColours();
         GetHeightMap();
         SetTerrainData();
@@ -411,44 +417,92 @@ public class Tectonics : MonoBehaviour
 
     void UpdatePoints()
     {
-        updatedPoints = points;
-        pointBuffer.SetData(points);
+        /*pointBuffer.SetData(points);
         updatedPointBuffer.SetData(updatedPoints);
         jumpFill.SetBuffer(updatePointsKernel, "points", pointBuffer);        
         jumpFill.SetBuffer(updatePointsKernel, "updatedPoints", updatedPointBuffer);
         jumpFill.SetInt("width", PlateTracker.width);
         jumpFill.SetInt("height", PlateTracker.height);
         jumpFill.Dispatch(updatePointsKernel, threadGroupsX, threadGroupsY, 1);
-        pointBuffer.GetData(updatedPoints);        
+        pointBuffer.GetData(updatedPoints);    */
+        m_minFloat = 0f;
+        m_maxFloat = 1f;
+        for (int i = 0; i < points.Length; i++)
+        {
+
+            int dirX = points[i].direction.x;
+            int dirY = points[i].direction.y;
+
+            dirX = dirX + points[i].position.x;
+            dirY = dirY + points[i].position.y;
+
+            if (dirX < 0)
+            {
+                dirX = PlateTracker.width + dirX;
+            }
+            else if (dirX > PlateTracker.width)
+            {
+                dirX = dirX - PlateTracker.width;
+            }
+            if (dirY < 0)
+            {
+                dirY = PlateTracker.height + dirY;
+            }
+            else if (dirY > PlateTracker.height)
+            {
+                dirY = dirY - PlateTracker.height;
+            }
+
+            int nextPos = PlateTracker.width * dirX + dirY;
+
+            if (i == nextPos)
+            {
+                updatedPoints[i] = points[i];
+            }
+            else if (points[i].plate != points[nextPos].plate)
+            {
+                if (points[i].plateType > points[nextPos].plateType)
+                {
+                    updatedPoints[nextPos].elevation = points[i].elevation +
+                        (points[i].elevation - points[nextPos].elevation) + 0.05f;
+                }
+                else if (points[i].plateType < points[nextPos].plateType)
+                {
+                    updatedPoints[nextPos].elevation = points[i].elevation +
+                        (points[nextPos].elevation - points[i].elevation) -0.05f;
+                }
+                else
+                {
+                    updatedPoints[nextPos].elevation = points[i].elevation + (points[i].elevation - points[nextPos].elevation) + 0.05f;
+                }
+            }
+            else
+            {
+                updatedPoints[nextPos].elevation = points[nextPos].elevation;
+            }
+            if (updatedPoints[nextPos].elevation < m_minFloat)
+            {
+                m_minFloat = updatedPoints[nextPos].elevation;
+            }
+            if (updatedPoints[nextPos].elevation > m_maxFloat)
+            {
+                m_maxFloat = updatedPoints[nextPos].elevation;
+            }
+        }
+        for(int i = 0; i < updatedPoints.Length; i++)
+        {
+            FloatRemap(updatedPoints[i].elevation);
+        }
     }
 
     void UpdatePlates()
     {
-        int differs = 0;
-        int same = 0;
-        int pointAmount = points.Length;
-        int upointAmount = updatedPoints.Length;
-        for (int i = 0; i < points.Length; i++)
-        {
-            if (points[i].position == updatedPoints[i].position &&
-                points[i].plateType == updatedPoints[i].plateType &&
-                points[i].plate == updatedPoints[i].plate &&
-                points[i].elevation == updatedPoints[i].elevation &&
-                points[i].direction == updatedPoints[i].direction)
-            {
-                same++;
-            }
-            else
-            {
-                differs++;
-            }
-        }
-        Debug.Log("There was " + differs + " different and " + same + " points. There was " + pointAmount + " in Points " + upointAmount + " in the updated ones.");
+     
         updatedPointBuffer.SetData(updatedPoints);
         jumpFill.SetBuffer(updatePlatesKernel, "updatedPoints", updatedPointBuffer);
         jumpFill.SetInt("width", PlateTracker.width);
         jumpFill.SetInt("height", PlateTracker.height);
-        jumpFill.SetTexture(updatePlatesKernel, "PlateTracker", PlateTracker);        
+        jumpFill.SetTexture(updatePlatesKernel, "PlateTracker", PlateTracker);
         jumpFill.Dispatch(updatePlatesKernel, threadGroupsX, threadGroupsY, 1);
         Graphics.Blit(PlateTracker, PlateResult);
     }
@@ -460,6 +514,15 @@ public class Tectonics : MonoBehaviour
         float high2 = 1;
         float low1 = m_minElevation;
         float high1 = m_maxElevation;
+        return low2 + (value - low1) * (high2 - low2) / (high1 - low1);
+    }
+
+    float FloatRemap(float value)
+    {
+        float low2 = 0;
+        float high2 = 1;
+        float low1 = m_minFloat;
+        float high1 = m_maxFloat;
         return low2 + (value - low1) * (high2 - low2) / (high1 - low1);
     }
 }

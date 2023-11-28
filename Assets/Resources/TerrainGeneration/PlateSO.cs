@@ -1,4 +1,3 @@
-using System.Security.Policy;
 using UnityEngine;
 
 [CreateAssetMenu(menuName = "Terrain Generator/Plate")]

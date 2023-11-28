@@ -210,51 +210,7 @@ void SetHeightMap(uint3 id : SV_DispatchThreadID)
 [numthreads(8,8,1)]
 void UpdatePoints(uint3 id : SV_DispatchThreadID)
 {
-    int curPos = width * id.x + id.y;
-    int dirX = points[curPos].direction.x;
-    int dirY = points[curPos].direction.y;
-	
-    dirX = dirX + id.x;
-    dirY = dirY + id.y;
-	
-    if (dirX < 0)
-    {
-        dirX = width + dirX;    
-    }
-    else if (dirX > width)
-    {
-        dirX = dirX - width;
-    }
-    if (dirY < 0)
-    {
-        dirY = height + dirY;
-    }
-    else if (dirY > height)
-    {
-        dirY = dirY - height;
-    }
-	
-    int nextPos = width * dirX + dirY;	    
-    
-	if(curPos == nextPos)
-    {
-        updatedPoints[curPos] = points[curPos];
-    }	
-	else if (points[curPos].plate != points[nextPos].plate)
-    {
-        if (points[curPos].plateType >= points[nextPos].plateType)
-        {
-            updatedPoints[nextPos].elevation = points[curPos].elevation + points[nextPos].elevation;
-        }        
-        else
-        {			
-            updatedPoints[nextPos].elevation = points[curPos].elevation - points[nextPos].elevation;
-        }
-    }	
-	else
-    {
-        updatedPoints[nextPos].elevation = points[nextPos].elevation;
-    }    
+  
 }
 
 [numthreads(8, 8, 1)]
