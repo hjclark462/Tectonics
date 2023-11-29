@@ -5,6 +5,7 @@
 #pragma kernel SetPointData
 #pragma kernel SmoothElevation
 #pragma kernel SetHeightMap
+#pragma kernel TestWorldColours
 #pragma kernel UpdatePoints
 #pragma kernel UpdatePlates
 
@@ -205,6 +206,34 @@ void SetHeightMap(uint3 id : SV_DispatchThreadID)
 {
 	float elevation = PlateTracker[id.xy].z;
 	HeightMap[id.xy] = float4(elevation, elevation, elevation, 1);
+}
+
+// Set texture colours to a shade of white to generate a height map
+[numthreads(8, 8, 1)]
+void TestWorldColours(uint3 id : SV_DispatchThreadID)
+{
+    float elevation = PlateTracker[id.xy].z;
+
+    if (elevation >= 0.95)
+    {
+        PlateResult[id.yx] = float4(elevation, elevation, elevation, 1);
+    }
+    else if (elevation >= 0.75 && elevation < 0.95)
+    {
+        PlateResult[id.yx] = float4(1 - elevation, 1 - elevation, 1 - elevation, 1);
+    }
+    else if (elevation >= 0.52 && elevation < 0.75)
+    {
+        PlateResult[id.yx] = float4(0, 1 - elevation, 0, 1);
+    }
+    else if (elevation >= 0.5 && elevation < 0.52)
+    {
+        PlateResult[id.yx] = float4(1, 1, elevation, 1);
+    }
+    else if (elevation < 0.5)
+    {
+        PlateResult[id.yx] = float4(0, 0, elevation, 1);
+    }
 }
 
 [numthreads(8,8,1)]
