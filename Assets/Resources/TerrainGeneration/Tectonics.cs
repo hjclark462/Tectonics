@@ -5,14 +5,14 @@ using UnityEngine;
 public class Tectonics : MonoBehaviour
 {
     [SerializeField]
-    [Tooltip("Check this to run the generator on play. If false can still generate using Tools: Generate Terrain. " +
-        "Beware this can override the current visual from editor to play if random plates is selected")]
-    bool m_runtime = false;
+    [Tooltip("Will generate a pseudorandom height terrain using the below values. If selected the Plate Objects array does not need to be filled" +
+        "to generate Terrain and will fill the list upon creation. Beware this can override the current visual from editor to " +
+        "play if random plates is selected")]
+    bool m_randomPlates = true;
 
     [SerializeField]
-    [Tooltip("Will generate a pseudorandom height terrain using the below values. If selected Plate Objects does not need to be filled" +
-        "to generate Terrain and will fill the list upon creation")]
-    bool m_randomPlates = true;
+    [Tooltip("If checked the update step will run, allowing the plates to run a tectonic plate simulation")]
+    bool m_updatePlates = true;
 
     [SerializeField]
     [Tooltip("List of Scriptable Objects that can be created from the Asset Menu under Terrain Generator: Plate. If Random Plates " +
@@ -123,7 +123,10 @@ public class Tectonics : MonoBehaviour
 
     private void Update()
     {
-        terrain.terrainData = UpdateTerrain();
+        if (m_updatePlates)
+        {
+            terrain.terrainData = UpdateTerrain();
+        }
     }
 
     public void CleanUp()
@@ -167,7 +170,7 @@ public class Tectonics : MonoBehaviour
     public TerrainData UpdateTerrain()
     {
         UpdatePoints();
-        UpdatePlates();        
+        UpdatePlates();
 
         SmoothElevation();
 
@@ -417,79 +420,20 @@ public class Tectonics : MonoBehaviour
 
     void UpdatePoints()
     {
-        /*pointBuffer.SetData(points);
+        m_minFloat = 0f;
+        m_maxFloat = 1f;
+        pointBuffer.SetData(points);
         updatedPointBuffer.SetData(updatedPoints);
-        jumpFill.SetBuffer(updatePointsKernel, "points", pointBuffer);        
+        jumpFill.SetBuffer(updatePointsKernel, "points", pointBuffer);
         jumpFill.SetBuffer(updatePointsKernel, "updatedPoints", updatedPointBuffer);
         jumpFill.SetInt("width", PlateTracker.width);
         jumpFill.SetInt("height", PlateTracker.height);
+        jumpFill.SetFloat("minFloat", m_minFloat);
+        jumpFill.SetFloat("maxFloat", m_maxFloat);
         jumpFill.Dispatch(updatePointsKernel, threadGroupsX, threadGroupsY, 1);
-        pointBuffer.GetData(updatedPoints);    */
-        m_minFloat = 0f;
-        m_maxFloat = 1f;
-        for (int i = 0; i < points.Length; i++)
-        {
+        updatedPointBuffer.GetData(updatedPoints);
 
-            int dirX = points[i].direction.x;
-            int dirY = points[i].direction.y;
-
-            dirX = dirX + points[i].position.x;
-            dirY = dirY + points[i].position.y;
-
-            if (dirX < 0)
-            {
-                dirX = PlateTracker.width + dirX;
-            }
-            else if (dirX > PlateTracker.width)
-            {
-                dirX = dirX - PlateTracker.width;
-            }
-            if (dirY < 0)
-            {
-                dirY = PlateTracker.height + dirY;
-            }
-            else if (dirY > PlateTracker.height)
-            {
-                dirY = dirY - PlateTracker.height;
-            }
-
-            int nextPos = PlateTracker.width * dirX + dirY;
-
-            if (i == nextPos)
-            {
-                updatedPoints[i] = points[i];
-            }
-            else if (points[i].plate != points[nextPos].plate)
-            {
-                if (points[i].plateType > points[nextPos].plateType)
-                {
-                    updatedPoints[nextPos].elevation = points[i].elevation +
-                        (points[i].elevation - points[nextPos].elevation) + 0.05f;
-                }
-                else if (points[i].plateType < points[nextPos].plateType)
-                {
-                    updatedPoints[nextPos].elevation = points[i].elevation +
-                        (points[nextPos].elevation - points[i].elevation) -0.05f;
-                }
-                else
-                {
-                    updatedPoints[nextPos].elevation = points[i].elevation + (points[i].elevation - points[nextPos].elevation) + 0.05f;
-                }
-            }
-            else
-            {
-                updatedPoints[nextPos].elevation = points[nextPos].elevation;
-            }
-            if (updatedPoints[nextPos].elevation < m_minFloat)
-            {
-                m_minFloat = updatedPoints[nextPos].elevation;
-            }
-            if (updatedPoints[nextPos].elevation > m_maxFloat)
-            {
-                m_maxFloat = updatedPoints[nextPos].elevation;
-            }
-        }
-        for(int i = 0; i < updatedPoints.Length; i++)
+        for (int i = 0; i < updatedPoints.Length; i++)
         {
             FloatRemap(updatedPoints[i].elevation);
         }
@@ -497,7 +441,7 @@ public class Tectonics : MonoBehaviour
 
     void UpdatePlates()
     {
-     
+
         updatedPointBuffer.SetData(updatedPoints);
         jumpFill.SetBuffer(updatePlatesKernel, "updatedPoints", updatedPointBuffer);
         jumpFill.SetInt("width", PlateTracker.width);

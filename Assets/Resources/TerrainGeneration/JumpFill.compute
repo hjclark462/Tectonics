@@ -32,6 +32,8 @@ int minHeight;
 int width;
 int height;
 int step;
+float minFloat;
+float maxFloat;
 
 // Clamps the flood fill so that it won't overflow the bounds of the RenderTexture
 uint2 ClampToTexture(uint2 p)
@@ -216,30 +218,88 @@ void TestWorldColours(uint3 id : SV_DispatchThreadID)
 
     if (elevation >= 0.95)
     {
-        PlateResult[id.yx] = float4(elevation, elevation, elevation, 1);
+        PlateResult[id.xy] = float4(elevation, elevation, elevation, 1);
     }
     else if (elevation >= 0.75 && elevation < 0.95)
     {
-        PlateResult[id.yx] = float4(1 - elevation, 1 - elevation, 1 - elevation, 1);
+        PlateResult[id.xy] = float4(1 - elevation, 1 - elevation, 1 - elevation, 1);
     }
     else if (elevation >= 0.52 && elevation < 0.75)
     {
-        PlateResult[id.yx] = float4(0, 1 - elevation, 0, 1);
+        PlateResult[id.xy] = float4(0, 1 - elevation, 0, 1);
     }
     else if (elevation >= 0.5 && elevation < 0.52)
     {
-        PlateResult[id.yx] = float4(1, 1, elevation, 1);
+        PlateResult[id.xy] = float4(1, 1, elevation, 1);
     }
     else if (elevation < 0.5)
     {
-        PlateResult[id.yx] = float4(0, 0, elevation, 1);
+        PlateResult[id.xy] = float4(0, 0, elevation, 1);
     }
 }
 
 [numthreads(8,8,1)]
 void UpdatePoints(uint3 id : SV_DispatchThreadID)
 {
-  
+    int pos = width * id.x + id.y;
+    int dirX = points[pos].direction.x;
+    int dirY = points[pos].direction.y;
+
+    dirX = dirX + points[pos].pixel.x;
+    dirY = dirY + points[pos].pixel.y;
+
+    if (dirX < 0)
+    {
+        dirX = width + dirX;
+    }
+    else if (dirX > width)
+    {
+        dirX = dirX - width;
+    }
+    if (dirY < 0)
+    {
+        dirY = height + dirY;
+    }
+    else if (dirY > height)
+    {
+        dirY = dirY - height;
+    }
+
+    int nextPos = width * dirX + dirY;
+
+    if (pos == nextPos)
+    {
+        updatedPoints[pos] = points[pos];
+    }
+    else if (points[pos].plate != points[nextPos].plate)
+    {
+        if (points[pos].plateType > points[nextPos].plateType)
+        {
+            updatedPoints[nextPos].elevation = points[pos].elevation +
+                        (points[pos].elevation - points[nextPos].elevation) + 0.05f;
+        }
+        else if (points[pos].plateType < points[nextPos].plateType)
+        {
+            updatedPoints[nextPos].elevation = points[pos].elevation +
+                        (points[nextPos].elevation - points[pos].elevation) - 0.05f;
+        }
+        else
+        {
+            updatedPoints[nextPos].elevation = points[pos].elevation + (points[pos].elevation - points[nextPos].elevation) + 0.05f;
+        }
+    }
+    else
+    {
+        updatedPoints[nextPos].elevation = points[nextPos].elevation;
+    }
+    if (updatedPoints[nextPos].elevation < minFloat)
+    {
+        minFloat = updatedPoints[nextPos].elevation;
+    }
+    if (updatedPoints[nextPos].elevation > maxFloat)
+    {
+        maxFloat = updatedPoints[nextPos].elevation;
+    }
 }
 
 [numthreads(8, 8, 1)]
